@@ -743,12 +743,12 @@ export default function CompetitiveHotelPrice() {
                 setDateRange({
                   ...dateRange,
                   start: e.target.value,
-                  end: getMinEndDate(e.target.value),
                 })
               }
               InputLabelProps={{ shrink: true }}
               inputProps={{ min: getTodayDate() }}
             />
+
             <TextField
               label="종료 날짜"
               type="date"
@@ -757,7 +757,7 @@ export default function CompetitiveHotelPrice() {
                 setDateRange({ ...dateRange, end: e.target.value })
               }
               InputLabelProps={{ shrink: true }}
-              inputProps={{ min: getMinEndDate(dateRange.start) }}
+              inputProps={{ min: dateRange.start }} // ✅ 시작일 이상만 가능
             />
             <Button
               variant="contained"
@@ -850,7 +850,7 @@ export default function CompetitiveHotelPrice() {
           <CircularProgress size={50} />
         </Box>
       ) : chartData ? (
-        <Box sx={{ mt: 3, width: "100%"}}>
+        <Box sx={{ mt: 3, width: "100%" }}>
           <Bar data={chartData} options={barChartOptions} />
         </Box>
       ) : null}
