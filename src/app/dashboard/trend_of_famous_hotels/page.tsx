@@ -1,9 +1,20 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Box, TextField, CircularProgress, Typography } from "@mui/material";
+import {
+  Box,
+  TextField,
+  CircularProgress,
+  Typography,
+  Grid,
+  Button,
+  FormControl,
+  InputLabel,
+} from "@mui/material";
 import { Line } from "react-chartjs-2";
 import { Chart as ChartJS, registerables } from "chart.js";
+import HotelIcon from '@mui/icons-material/Hotel';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 
 ChartJS.register(...registerables);
 
@@ -103,106 +114,444 @@ export default function CompetitorHotelTrends() {
       : [];
 
   return (
-    <Box sx={{ padding: "20px", width: "100%" }}>
-      <Typography variant="h4" gutterBottom>
-        경쟁 호텔 가격 및 트렌드 (오늘부터 +32일)
-      </Typography>
-      <Box sx={{ display: "flex", gap: 2, mb: 3, alignItems: "center" }}>
-        <TextField
-          label="시작 날짜"
-          type="date"
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-          InputLabelProps={{ shrink: true }}
-        />
-        <TextField
-          label="종료 날짜"
-          type="date"
-          value={endDate}
-          InputProps={{ readOnly: true }}
-          InputLabelProps={{ shrink: true }}
-        />
-      </Box>
-
-      {loading ? (
-        <CircularProgress />
-      ) : (
-        <>
-          {/* PCA 트렌드 차트 (PC1) - 상단에 표시 */}
-          <Box sx={{ mb: 5 }}>
-            <Typography variant="h5" gutterBottom>
-              경쟁 호텔 트렌드 (PCA 기반 PC1)
-            </Typography>
-            <Line
-              data={{
-                labels: pcaData.dates,
-                datasets: [
-                  {
-                    label: "PC1 Trend",
-                    data: pcaData.pc1,
-                    borderColor: "blue",
-                    backgroundColor: "lightblue",
-                    fill: false,
-                  },
-                ],
+    <Box sx={{ 
+      padding: { xs: '16px', md: '24px' }, 
+      maxWidth: '1400px', 
+      margin: '0 auto', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      gap: '24px',
+      minHeight: 'calc(100vh - 100px)'
+    }}>
+      {/* 헤더 섹션 */}
+      <h1 className="text-2xl font-bold mb-4" style={{ 
+        color: '#2c3e50',
+        padding: '16px 0',
+        borderBottom: '2px solid #e2e8f0',
+        display: 'flex',
+        alignItems: 'center'
+      }}>
+        <TrendingUpIcon style={{ marginRight: '8px', color: '#2c3e50' }} /> 
+        Hotel Trends
+      </h1>
+      
+      {/* 메인 콘텐츠 영역 */}
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        gap: '24px',
+        width: '100%'
+      }}>
+        {/* 필터 영역 */}
+        <Box sx={{ 
+          borderRadius: '16px', 
+          overflow: 'hidden',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
+          backgroundColor: 'white'
+        }}>
+          <Box sx={{ p: 3 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                gap: 2,
+                flexWrap: 'wrap',
+                alignItems: 'center',
               }}
-              options={{
-                responsive: true,
-                plugins: {
-                  title: {
-                    display: true,
-                    text: "경쟁 호텔 트렌드 (PCA - PC1)",
-                  },
-                },
-                scales: {
-                  x: {
-                    title: { display: true, text: "날짜" },
-                  },
-                  y: {
-                    title: { display: true, text: "PC1" },
-                  },
-                },
-              }}
-            />
-          </Box>
-
-          {/* 개별 호텔 가격 차트 (3열 그리드) */}
-          <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4 }}>
-            {Object.keys(hotelData).map((hotel, index) => (
-              <Box key={index}>
-                <Typography variant="h6" gutterBottom>
-                  {hotel}
-                </Typography>
-                <Line
-                  data={{
-                    labels: hotelData[hotel].dates,
-                    datasets: [
-                      {
-                        label: `가격 변화 (${hotel})`,
-                        data: hotelData[hotel].prices,
-                        borderColor: `hsl(${index * 60}, 70%, 50%)`,
-                        backgroundColor: `hsl(${index * 60}, 70%, 70%)`,
-                        fill: false,
-                      },
-                    ],
-                  }}
-                  options={{
-                    responsive: true,
-                    scales: {
-                      x: {
-                        title: { display: true, text: "날짜" },
-                      },
-                      y: {
-                        title: { display: true, text: "평균 객실 가격 (원)" },
-                      },
+            >
+              <TextField
+                label="시작 날짜"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                sx={{ 
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '8px',
+                    '&:hover fieldset': {
+                      borderColor: '#2c3e50',
                     },
-                  }}
-                />
-              </Box>
-            ))}
+                    '&.Mui-focused fieldset': {
+                      borderColor: '#2c3e50',
+                    },
+                  }
+                }}
+              />
+              <TextField
+                label="종료 날짜"
+                type="date"
+                value={endDate}
+                InputProps={{ readOnly: true }}
+                InputLabelProps={{ shrink: true }}
+                sx={{ 
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '8px',
+                    '&:hover fieldset': {
+                      borderColor: '#2c3e50',
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: '#2c3e50',
+                    },
+                  }
+                }}
+              />
+              <Button 
+                variant="contained" 
+                onClick={() => {
+                  fetchHotelPrices(startDate, endDate);
+                  fetchHotelPCA(startDate, endDate);
+                }}
+                sx={{ 
+                  backgroundColor: '#2c3e50',
+                  '&:hover': {
+                    backgroundColor: '#34495e',
+                  },
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                  padding: '8px 16px'
+                }}
+              >
+                검색
+              </Button>
+            </Box>
           </Box>
-        </>
-      )}
+        </Box>
+
+        {/* 로딩 표시 */}
+        {loading && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+            <CircularProgress sx={{ color: '#2c3e50' }} />
+          </Box>
+        )}
+
+        {/* PCA 트렌드 차트 */}
+        {pcaData.dates.length > 0 && (
+          <Box sx={{ 
+            borderRadius: '16px', 
+            overflow: 'hidden',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
+            backgroundColor: 'white'
+          }}>
+            <Box sx={{ 
+              p: 3, 
+              borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'linear-gradient(90deg, #2c3e50 0%, #34495e 100%)',
+              color: 'white'
+            }}>
+              <h2 className="text-lg font-semibold" style={{ color: 'white', display: 'flex', alignItems: 'center' }}>
+                <TrendingUpIcon style={{ marginRight: '8px' }} /> 
+                주요 호텔 추세 그래프
+              </h2>
+            </Box>
+            
+            <Box sx={{ p: 3 }}>
+              <Line
+                data={{
+                  labels: pcaData.dates.map(date => {
+                    // 날짜에서 연도 부분 제거하고 월-일만 표시
+                    const parts = date.split('-');
+                    return `${parts[1]}-${parts[2]}`;
+                  }),
+                  datasets: [
+                    {
+                      label: "호텔 가격 변동지수",
+                      data: pcaData.pc1,
+                      borderColor: "#3498db",
+                      backgroundColor: (context) => {
+                        const chart = context.chart;
+                        const { ctx, chartArea } = chart;
+                        if (!chartArea) return 'rgba(52, 152, 219, 0.2)'; // 기본값 반환
+                        
+                        // y축 0 위치 계산
+                        const yScale = chart.scales.y;
+                        const zeroY = yScale.getPixelForValue(0);
+                        
+                        // 그라데이션 생성
+                        const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                        gradient.addColorStop(0, 'rgba(231, 76, 60, 0.2)'); // 위쪽 (음수값) - 빨간색
+                        gradient.addColorStop(yScale.getPixelForValue(0) / chartArea.bottom, 'rgba(231, 76, 60, 0.05)');
+                        gradient.addColorStop(yScale.getPixelForValue(0) / chartArea.bottom, 'rgba(52, 152, 219, 0.05)');
+                        gradient.addColorStop(1, 'rgba(52, 152, 219, 0.2)'); // 아래쪽 (양수값) - 파란색
+                        
+                        return gradient;
+                      },
+                      fill: true,
+                      tension: 0.4,
+                      borderWidth: 2,
+                      pointRadius: 3,
+                      pointBackgroundColor: "#fff",
+                      pointBorderColor: (context) => {
+                        // 포인트 색상도 값에 따라 변경
+                        const value = context.raw as number;
+                        return value >= 0 ? '#3498db' : '#e74c3c';
+                      },
+                      pointHoverRadius: 5,
+                      segment: {
+                        borderColor: (context) => {
+                          // 선 색상도 값에 따라 변경
+                          const p0 = context.p0.parsed;
+                          const p1 = context.p1.parsed;
+                          
+                          // 두 점이 모두 0보다 크거나 같으면 파란색
+                          if (p0.y >= 0 && p1.y >= 0) return '#3498db';
+                          // 두 점이 모두 0보다 작으면 빨간색
+                          if (p0.y < 0 && p1.y < 0) return '#e74c3c';
+                          // 0을 교차하는 경우 - 중간 색상 사용
+                          return '#9b59b6'; // 중간 색상(보라색)으로 표시
+                        }
+                      }
+                    },
+                  ],
+                }}
+                options={{
+                  responsive: true,
+                  plugins: {
+                    title: {
+                      display: false,
+                    },
+                    legend: {
+                      position: 'top',
+                      labels: {
+                        boxWidth: 12,
+                        usePointStyle: true,
+                        pointStyle: 'circle',
+                      }
+                    },
+                    tooltip: {
+                      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                      titleColor: '#2c3e50',
+                      bodyColor: '#2c3e50',
+                      borderColor: 'rgba(0, 0, 0, 0.1)',
+                      borderWidth: 1,
+                      padding: 12,
+                      boxPadding: 6,
+                      usePointStyle: true,
+                      bodyFont: {
+                        family: "'Pretendard', 'Noto Sans KR', sans-serif"
+                      },
+                      titleFont: {
+                        family: "'Pretendard', 'Noto Sans KR', sans-serif",
+                        weight: 'bold'
+                      }
+                    }
+                  },
+                  scales: {
+                    x: {
+                      title: { display: false },
+                      grid: {
+                        display: false
+                      },
+                      ticks: {
+                        color: '#64748b'
+                      }
+                    },
+                    y: {
+                      title: { display: true, text: "변동지수", color: '#64748b' },
+                      grid: {
+                        color: (context) => {
+                          // y=0 선은 더 진하게 표시
+                          return context.tick.value === 0 ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.05)';
+                        }
+                      },
+                      ticks: {
+                        color: '#64748b'
+                      }
+                    },
+                  },
+                }}
+              />
+            </Box>
+            
+            <Box sx={{ 
+              p: 2, 
+              borderTop: '1px solid rgba(0, 0, 0, 0.05)',
+              backgroundColor: '#f8fafc',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              alignItems: 'center'
+            }}>
+              <span style={{ color: '#64748b', fontSize: '0.8rem' }}>
+                변동지수는 호텔 가격 변동의 주요 추세를 나타냅니다
+              </span>
+            </Box>
+          </Box>
+        )}
+
+        {/* 개별 호텔 가격 차트 */}
+        {Object.keys(hotelData).length > 0 && (
+          <Box sx={{ 
+            borderRadius: '16px', 
+            overflow: 'hidden',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
+            backgroundColor: 'white'
+          }}>
+            <Box sx={{ 
+              p: 3, 
+              borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'linear-gradient(90deg, #2c3e50 0%, #34495e 100%)',
+              color: 'white'
+            }}>
+              <h2 className="text-lg font-semibold" style={{ color: 'white', display: 'flex', alignItems: 'center' }}>
+                <TrendingUpIcon style={{ marginRight: '8px' }} /> 
+                주요 호텔별 요금 추세
+              </h2>
+            </Box>
+            
+            <Box sx={{ p: 3 }}>
+              <Grid container spacing={2}>
+                {Object.keys(hotelData).map((hotel, index) => {
+                  const color = chartColors[index % chartColors.length];
+                  return (
+                    <Grid item xs={12} sm={6} md={4} key={hotel}>
+                      <Box
+                        sx={{
+                          border: '1px solid #e2e8f0',
+                          p: 2,
+                          borderRadius: '12px',
+                          height: '100%',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            boxShadow: '0 8px 16px rgba(0, 0, 0, 0.1)',
+                            transform: 'translateY(-4px)'
+                          }
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            mb: 2,
+                            fontWeight: "bold",
+                            textAlign: "center",
+                            color: '#2c3e50',
+                            fontSize: '1rem',
+                            padding: '8px',
+                            borderRadius: '8px',
+                            backgroundColor: 'rgba(44, 62, 80, 0.05)'
+                          }}
+                        >
+                          {hotel} (가격 추세)
+                        </Box>
+                        <Line
+                          data={{
+                            labels: hotelData[hotel].dates.map(date => {
+                              // 날짜에서 연도 부분 제거하고 월-일만 표시
+                              const parts = date.split('-');
+                              return `${parts[1]}-${parts[2]}`;
+                            }),
+                            datasets: [
+                              {
+                                label: `${hotel} 가격 추세`,
+                                data: hotelData[hotel].prices,
+                                backgroundColor: color.backgroundColor,
+                                borderColor: color.borderColor,
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 2,
+                                pointBackgroundColor: "#fff",
+                              },
+                            ],
+                          }}
+                          options={{
+                            responsive: true,
+                            scales: {
+                              x: {
+                                title: { display: false },
+                                grid: {
+                                  display: false
+                                },
+                                ticks: {
+                                  color: '#64748b',
+                                  maxRotation: 45,
+                                  minRotation: 45
+                                }
+                              },
+                              y: {
+                                title: { display: false },
+                                grid: {
+                                  color: 'rgba(0, 0, 0, 0.05)'
+                                },
+                                ticks: {
+                                  color: '#64748b'
+                                }
+                              },
+                            },
+                            plugins: {
+                              legend: { display: false },
+                              tooltip: {
+                                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                                titleColor: '#2c3e50',
+                                bodyColor: '#2c3e50',
+                                borderColor: 'rgba(0, 0, 0, 0.1)',
+                                borderWidth: 1,
+                                padding: 8,
+                                boxPadding: 4,
+                                usePointStyle: true,
+                                callbacks: {
+                                  label: function(context) {
+                                    return `가격: ${context.parsed.y.toLocaleString()}원`;
+                                  }
+                                }
+                              }
+                            },
+                          }}
+                        />
+                      </Box>
+                    </Grid>
+                  );
+                })}
+              </Grid>
+            </Box>
+            
+            <Box sx={{ 
+              p: 2, 
+              borderTop: '1px solid rgba(0, 0, 0, 0.05)',
+              backgroundColor: '#f8fafc',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              alignItems: 'center'
+            }}>
+              <span style={{ color: '#64748b', fontSize: '0.8rem' }}>
+                마지막 업데이트: {new Date().toLocaleString('ko-KR')}
+              </span>
+            </Box>
+          </Box>
+        )}
+      </Box>
     </Box>
   );
 }
+
+// 차트 색상 배열 추가
+const chartColors = [
+  { backgroundColor: "rgba(52, 152, 219, 0.2)", borderColor: "#3498db" },
+  { backgroundColor: "rgba(230, 126, 34, 0.2)", borderColor: "#e67e22" },
+  { backgroundColor: "rgba(46, 204, 113, 0.2)", borderColor: "#2ecc71" },
+  { backgroundColor: "rgba(155, 89, 182, 0.2)", borderColor: "#9b59b6" },
+  { backgroundColor: "rgba(231, 76, 60, 0.2)", borderColor: "#e74c3c" },
+  { backgroundColor: "rgba(26, 188, 156, 0.2)", borderColor: "#1abc9c" },
+  { backgroundColor: "rgba(241, 196, 15, 0.2)", borderColor: "#f1c40f" },
+  { backgroundColor: "rgba(52, 73, 94, 0.2)", borderColor: "#34495e" },
+  { backgroundColor: "rgba(22, 160, 133, 0.2)", borderColor: "#16a085" },
+];
+
+// 그라데이션 생성 함수
+const createGradient = (
+  context: {
+    p0: { x: number; y: number; parsed: { y: number } };
+    p1: { x: number; y: number; parsed: { y: number } };
+    chart: { ctx: CanvasRenderingContext2D }
+  }, 
+  colorStart: string, 
+  colorEnd: string
+): CanvasGradient => {
+  const { p0, p1 } = context;
+  const gradient = context.chart.ctx.createLinearGradient(p0.x, p0.y, p1.x, p1.y);
+  gradient.addColorStop(0, colorStart);
+  gradient.addColorStop(1, colorEnd);
+  return gradient;
+};

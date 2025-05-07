@@ -1,69 +1,186 @@
 .custom-calendar {
     width: 100%;
     border: none;
-    font-family: 'Arial', sans-serif;
+    font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border-radius: 12px;
+    padding: 16px;
+    background-color: #fff;
 }
 
+/* 캘린더 헤더 스타일링 */
+.custom-calendar .react-calendar__navigation {
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.custom-calendar .react-calendar__navigation button {
+    min-width: 40px;
+    height: 40px;
+    background: none;
+    border: none;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    color: #333;
+    transition: all 0.2s;
+}
+
+.custom-calendar .react-calendar__navigation button:hover {
+    background-color: #f0f7ff;
+}
+
+.custom-calendar .react-calendar__navigation button:disabled {
+    opacity: 0.5;
+}
+
+.custom-calendar .react-calendar__navigation__label {
+    font-weight: 600;
+    font-size: 1.1rem;
+    flex-grow: 1;
+}
+
+/* 요일 헤더 스타일링 */
+.custom-calendar .react-calendar__month-view__weekdays {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #555;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+}
+
+.custom-calendar .react-calendar__month-view__weekdays__weekday {
+    padding: 10px 0;
+}
+
+/* 날짜 타일 스타일링 */
 .custom-calendar .react-calendar__tile {
     position: relative;
-    padding: 10px;
+    padding: 12px 8px;
     cursor: pointer;
-    border-radius: 5px;
-    transition: background 0.2s ease-in-out, font-weight 0.2s ease-in-out;
+    border-radius: 8px;
+    transition: all 0.2s ease-in-out;
+    height: 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    font-size: 0.95rem;
 }
 
 .custom-calendar .react-calendar__tile:hover {
-    background: #e3f2fd;
+    background: #f0f7ff;
 }
 
-/* ✅ 오늘 날짜 스타일 (배경 투명, 기본 글씨체 유지) */
+/* 오늘 날짜 스타일 */
 .today-highlight {
     background-color: transparent !important;
-    color: black !important;
-    font-weight: normal !important;  /* 기본 상태에서는 bold 제거 */
+    color: #1976d2 !important;
+    font-weight: 500 !important;
+    border: 2px solid #e3f2fd !important;
 }
 
-/* ✅ 클릭한 날짜 스타일 */
+/* 선택된 날짜 스타일 */
 .custom-calendar .react-calendar__tile.selected-date {
-    background-color: rgba(25, 118, 210, 0.8) !important; /* 🔹 배경만 투명하게 설정 */
+    background-color: rgba(25, 118, 210, 0.9) !important;
     color: white;
-    font-weight: bold !important;
+    font-weight: 600 !important;
+    box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3);
 }
 
-/* ✅ 오늘 날짜 스타일 (클릭 후 bold 유지) */
+/* 오늘 날짜가 선택되었을 때 스타일 */
 .custom-calendar .react-calendar__tile.selected-date.today-date {
-    font-weight: bold !important;
+    font-weight: 600 !important;
+    border: none !important;
 }
 
-/* 이벤트 수 표시 */
-.event-count {
-    font-size: 0.8rem;
-    background: none;
-    border-radius: 10px;
-    padding: 2px 5px;
-    margin-top: 5px;
-    color: black;
-}
-
+/* 타일 내부 콘텐츠 스타일링 */
 .tile-content {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 0.55rem; /* 기본 폰트 크기 조정 */
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    margin-top: 6px;
+    align-items: center;
 }
 
+/* 이벤트 카운트 배지 */
 .event-count {
-  background-color: lightblue;
-  border-radius: 4px;
-  padding: 2px 4px;
-  color: blue;
-  font-size: 0.55rem; /* 이벤트 텍스트 크기 조정 */
+    background-color: rgba(33, 150, 243, 0.15);
+    border-radius: 6px;
+    padding: 2px 6px;
+    color: #1565c0;
+    font-size: 0.65rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+    margin: 0 auto;
+    white-space: nowrap;
 }
 
+/* 휴일 카운트 배지 */
 .holiday-count {
-  background-color: #ffe6e6;
-  border-radius: 4px;
-  padding: 2px 4px;
-  color: red;
-  font-size: 0.55rem; /* 휴일 텍스트 크기 조정 */
+    background-color: rgba(244, 67, 54, 0.15);
+    border-radius: 6px;
+    padding: 2px 6px;
+    color: #d32f2f;
+    font-size: 0.65rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+    margin: 0 auto;
+    white-space: nowrap;
+}
+
+/* 주말 날짜 색상 */
+.custom-calendar .react-calendar__month-view__days__day--weekend {
+    color: #f44336;
+}
+
+/* 다른 달 날짜 스타일 */
+.custom-calendar .react-calendar__month-view__days__day--neighboringMonth {
+    color: #bdbdbd;
+}
+
+/* 상세 정보 패널 스타일 */
+.event-details-panel {
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+/* 이벤트 카드 스타일 */
+.event-card {
+    border-left: 4px solid #1976d2;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+    transition: all 0.2s ease;
+}
+
+.event-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 휴일 카드 스타일 */
+.holiday-card {
+    border-left: 4px solid #f44336;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+    transition: all 0.2s ease;
+}
+
+.holiday-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }

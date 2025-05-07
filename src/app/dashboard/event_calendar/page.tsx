@@ -2,11 +2,14 @@
 
 import React, { useEffect, useState } from 'react';
 import Calendar from 'react-calendar';
-import { Box, Typography, Paper, CircularProgress } from '@mui/material';
+import { Box, Typography, Paper, CircularProgress, Button, Divider } from '@mui/material';
 import 'react-calendar/dist/Calendar.css';
 import './CustomCalendar.css';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import PeopleIcon from '@mui/icons-material/People';
+import EventIcon from '@mui/icons-material/Event';
+import BeachAccessIcon from '@mui/icons-material/BeachAccess';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -130,6 +133,7 @@ const EventCalendarGrid = () => {
   const [performanceDetails, setPerformanceDetails] = useState<PerformanceDetails[]>([]);
   const [detailsLoading, setDetailsLoading] = useState<boolean>(false);
   const [isMonthChanging, setIsMonthChanging] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<'events' | 'holidays'>('events');
 
   // 월 변경 시 공연 및 휴일 정보 함께 불러오기
   useEffect(() => {
@@ -189,6 +193,7 @@ const EventCalendarGrid = () => {
     const dateStr = formatDate(date);
     const eventCount = groupedEvents[dateStr]?.length || 0;
     const holidayCount = groupedHolidays[dateStr]?.length || 0;
+    
     return (
       <Box className="tile-content">
         {eventCount > 0 && (
@@ -208,74 +213,411 @@ const EventCalendarGrid = () => {
   // 선택 날짜의 휴일 정보
   const holidayDetails = groupedHolidays[selectedDate] || [];
 
+  // 탭 변경 핸들러
+  const handleTabChange = (tab: 'events' | 'holidays') => {
+    setActiveTab(tab);
+  };
+
   return (
-    <Box sx={{ padding: '20px', maxWidth: '1100px', margin: '0 auto', display: 'flex', gap: '20px' }}>
-      {/* 캘린더 영역 */}
-      <Box sx={{ flex: 1 }}>
-        <Typography variant="h4" gutterBottom>
-          공연 일정
-        </Typography>
-        <Calendar
-          onClickDay={handleDateClick}
-          onActiveStartDateChange={handleMonthChange}
-          tileClassName={({ date }) => {
-            const dateStr = formatDate(date);
-            if (dateStr === formattedToday && dateStr !== selectedDate) return 'today-highlight';
-            if (dateStr === selectedDate) return 'selected-date';
-            return '';
+    <Box sx={{ 
+      padding: { xs: '16px', md: '24px' }, 
+      maxWidth: '1400px', 
+      margin: '0 auto', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      gap: '24px',
+      minHeight: 'calc(100vh - 100px)'
+    }}>
+      {/* 헤더 섹션 - 대시보드와 일관된 스타일로 변경 */}
+      <h1 className="text-2xl font-bold mb-4" style={{ 
+        color: '#2c3e50',
+        padding: '16px 0',
+        borderBottom: '2px solid #e2e8f0',
+        display: 'flex',
+        alignItems: 'center'
+      }}>
+        <CalendarTodayIcon style={{ marginRight: '8px', color: '#2c3e50' }} /> 
+        Event Calendar
+      </h1>
+      
+      {/* 메인 콘텐츠 영역 */}
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: { xs: 'column', md: 'row' }, 
+        gap: '24px',
+        width: '100%'
+      }}>
+        {/* 캘린더 영역 */}
+        <Box sx={{ 
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          borderRadius: '16px',
+          overflow: 'hidden',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
+          backgroundColor: 'white'
+        }}>
+          <Box sx={{ 
+            p: 3, 
+            borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            background: 'linear-gradient(90deg, #2c3e50 0%, #34495e 100%)',
+            color: 'white'
+          }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, color: 'white', display: 'flex', alignItems: 'center' }}>
+              <EventIcon sx={{ mr: 1 }} />
+              공연 일정
+            </Typography>
+          </Box>
+          
+          <Box sx={{ 
+            position: 'relative',
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            p: 3
+          }}>
+            {isMonthChanging && (
+              <Box sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                zIndex: 10,
+                borderRadius: '12px'
+              }}>
+                <CircularProgress />
+              </Box>
+            )}
+            <Calendar
+              onClickDay={handleDateClick}
+              onActiveStartDateChange={handleMonthChange}
+              tileClassName={({ date }) => {
+                const dateStr = formatDate(date);
+                const classes = [];
+                if (dateStr === formattedToday) classes.push('today-highlight');
+                if (dateStr === selectedDate) classes.push('selected-date');
+                if (dateStr === formattedToday && dateStr === selectedDate) classes.push('today-date');
+                return classes.join(' ');
+              }}
+              tileContent={renderTileContent}
+              className="custom-calendar"
+            />
+          </Box>
+          
+          <Box sx={{ 
+            p: 2, 
+            borderTop: '1px solid rgba(0, 0, 0, 0.05)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            backgroundColor: '#f8fafc'
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Box sx={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#1976d2' }}></Box>
+                <Typography variant="caption" sx={{ color: '#64748b' }}>이벤트</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Box sx={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#e74c3c' }}></Box>
+                <Typography variant="caption" sx={{ color: '#64748b' }}>휴일</Typography>
+              </Box>
+            </Box>
+            <Typography variant="caption" sx={{ color: '#64748b' }}>
+              {currentYear}년 {currentMonth}월
+            </Typography>
+          </Box>
+        </Box>
+        
+        {/* 공연 및 휴일 상세 정보 영역 */}
+        <Box 
+          sx={{ 
+            flex: 1, 
+            display: 'flex',
+            flexDirection: 'column',
+            borderRadius: '16px',
+            overflow: 'hidden',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
+            backgroundColor: 'white'
           }}
-          tileContent={renderTileContent}
-          className="custom-calendar"
-        />
+        >
+          <Box sx={{ 
+            p: 3, 
+            borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            background: 'linear-gradient(90deg, #2c3e50 0%, #34495e 100%)',
+            color: 'white'
+          }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, color: 'white' }}>
+              {selectedDate} 상세 정보
+            </Typography>
+          </Box>
+          
+          {/* 탭 버튼 */}
+          <Box sx={{ 
+            display: 'flex', 
+            gap: 2, 
+            p: 3,
+            borderBottom: '1px solid #e2e8f0',
+          }}>
+            <Button
+              variant={activeTab === 'events' ? 'contained' : 'outlined'}
+              color="primary"
+              startIcon={<EventIcon />}
+              onClick={() => handleTabChange('events')}
+              sx={{ 
+                borderRadius: '8px',
+                fontWeight: 500,
+                flex: 1,
+                backgroundColor: activeTab === 'events' ? '#2c3e50' : 'transparent',
+                '&:hover': {
+                  backgroundColor: activeTab === 'events' ? '#34495e' : 'rgba(44, 62, 80, 0.04)'
+                }
+              }}
+            >
+              공연 목록 ({performanceDetails.length})
+            </Button>
+            
+            <Button
+              variant={activeTab === 'holidays' ? 'contained' : 'outlined'}
+              color="error"
+              startIcon={<BeachAccessIcon />}
+              onClick={() => handleTabChange('holidays')}
+              sx={{ 
+                borderRadius: '8px',
+                fontWeight: 500,
+                flex: 1,
+                backgroundColor: activeTab === 'holidays' ? '#e74c3c' : 'transparent',
+                '&:hover': {
+                  backgroundColor: activeTab === 'holidays' ? '#c0392b' : 'rgba(231, 76, 60, 0.04)'
+                }
+              }}
+            >
+              휴일 정보 ({holidayDetails.length})
+            </Button>
+          </Box>
+          
+          {/* 콘텐츠 영역 */}
+          <Box sx={{ 
+            flex: 1, 
+            overflow: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            p: 3,
+            maxHeight: { xs: '400px', md: '600px' }
+          }}>
+            {detailsLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress sx={{ color: '#2c3e50' }} />
+              </Box>
+            ) : (
+              <>
+                {/* 공연 정보 탭 */}
+                {activeTab === 'events' && (
+                  <>
+                    {performanceDetails.length > 0 ? (
+                      <Box>
+                        {performanceDetails.map((detail) => (
+                          <Box 
+                            key={detail.id} 
+                            className="event-card"
+                            sx={{ 
+                              mb: 2,
+                              borderLeft: '4px solid #2c3e50',
+                              backgroundColor: '#f8fafc',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              transition: 'all 0.3s ease',
+                              '&:hover': {
+                                transform: 'translateY(-3px)',
+                                boxShadow: '0 8px 16px rgba(0, 0, 0, 0.1)',
+                                backgroundColor: '#fff'
+                              }
+                            }}
+                          >
+                            <Typography 
+                              variant="subtitle1" 
+                              sx={{ 
+                                fontWeight: 600,
+                                mb: 1,
+                                color: '#2c3e50'
+                              }}
+                            >
+                              {detail.name}
+                            </Typography>
+                            
+                            <Divider sx={{ my: 1.5, opacity: 0.6 }} />
+                            
+                            <Box sx={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: 1,
+                              mb: 1
+                            }}>
+                              <LocationOnIcon 
+                                fontSize="small" 
+                                sx={{ color: '#3498db' }} 
+                              />
+                              <Typography variant="body2" sx={{ color: '#34495e' }}>
+                                {detail.venue || '장소 정보 없음'}
+                              </Typography>
+                            </Box>
+                            
+                            <Box sx={{ 
+                              display: 'flex', 
+                              alignItems: 'flex-start', 
+                              gap: 1 
+                            }}>
+                              <PeopleIcon 
+                                fontSize="small" 
+                                sx={{ color: '#9b59b6', mt: 0.5 }} 
+                              />
+                              <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                  lineHeight: 1.4,
+                                  color: '#34495e'
+                                }}
+                              >
+                                {detail.cast && detail.cast.length > 0 ? detail.cast : '출연자 정보 없음'}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        ))}
+                      </Box>
+                    ) : (
+                      <Box 
+                        sx={{ 
+                          display: 'flex', 
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          py: 6,
+                          color: '#94a3b8'
+                        }}
+                      >
+                        <EventIcon sx={{ fontSize: '3rem', mb: 2, color: '#cbd5e1' }} />
+                        <Typography>
+                          해당 날짜에 공연 정보가 없습니다.
+                        </Typography>
+                      </Box>
+                    )}
+                  </>
+                )}
+                
+                {/* 휴일 정보 탭 */}
+                {activeTab === 'holidays' && (
+                  <>
+                    {holidayDetails.length > 0 ? (
+                      <Box>
+                        {holidayDetails.map((holiday, idx) => (
+                          <Box 
+                            key={idx} 
+                            className="holiday-card"
+                            sx={{ 
+                              mb: 2,
+                              borderLeft: '4px solid #e74c3c',
+                              backgroundColor: '#f8fafc',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              transition: 'all 0.3s ease',
+                              '&:hover': {
+                                transform: 'translateY(-3px)',
+                                boxShadow: '0 8px 16px rgba(0, 0, 0, 0.1)',
+                                backgroundColor: '#fff'
+                              }
+                            }}
+                          >
+                            <Typography 
+                              variant="subtitle1" 
+                              sx={{ 
+                                fontWeight: 600,
+                                mb: 1,
+                                color: '#2c3e50'
+                              }}
+                            >
+                              {holiday.holiday_name}
+                            </Typography>
+                            
+                            <Divider sx={{ my: 1.5, opacity: 0.6 }} />
+                            
+                            <Typography 
+                              variant="body2" 
+                              sx={{ 
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1,
+                                color: '#34495e'
+                              }}
+                            >
+                              <span role="img" aria-label="country" style={{ fontSize: '1.2rem' }}>🌍</span>
+                              국가: {holiday.country}
+                            </Typography>
+                            
+                            <Typography 
+                              variant="body2" 
+                              sx={{ 
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1,
+                                mt: 1,
+                                color: '#34495e'
+                              }}
+                            >
+                              <span role="img" aria-label="date" style={{ fontSize: '1.2rem' }}>📅</span>
+                              기간: {holiday.holiday_start_date} ~ {holiday.holiday_end_date}
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    ) : (
+                      <Box 
+                        sx={{ 
+                          display: 'flex', 
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          py: 6,
+                          color: '#94a3b8'
+                        }}
+                      >
+                        <BeachAccessIcon sx={{ fontSize: '3rem', mb: 2, color: '#cbd5e1' }} />
+                        <Typography>
+                          해당 날짜에 휴일 정보가 없습니다.
+                        </Typography>
+                      </Box>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+          </Box>
+          
+          <Box sx={{ 
+            p: 2, 
+            borderTop: '1px solid rgba(0, 0, 0, 0.05)',
+            backgroundColor: '#f8fafc',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <Typography variant="caption" sx={{ color: '#64748b' }}>
+              {activeTab === 'events' ? '공연 정보' : '휴일 정보'} 조회
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748b' }}>
+              {selectedDate}
+            </Typography>
+          </Box>
+        </Box>
       </Box>
-      {/* 공연 및 휴일 상세 정보 영역 */}
-      <Paper sx={{ flex: 1, padding: '15px' }}>
-        {detailsLoading ? (
-          <CircularProgress />
-        ) : (
-          <>
-            {/* 공연 정보 */}
-            {performanceDetails.length > 0 && (
-              <>
-                <Typography variant="h5">{selectedDate}의 공연 목록</Typography>
-                {performanceDetails.map((detail) => (
-                  <Box key={detail.id} sx={{ marginBottom: '10px' }}>
-                    <Typography variant="h6">{detail.name}</Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <LocationOnIcon color="primary" />
-                      <Typography>공연 위치: {detail.venue}</Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <PeopleIcon color="secondary" />
-                      <Typography>
-                        출연자: {detail.cast && detail.cast.length > 0 ? detail.cast : '출연자 정보 없음'}
-                      </Typography>
-                    </Box>
-                  </Box>
-                ))}
-              </>
-            )}
-            {/* 휴일 정보 */}
-            {holidayDetails.length > 0 && (
-              <>
-                <Typography variant="h5" sx={{ marginTop: performanceDetails.length > 0 ? 2 : 0 }}>
-                  {selectedDate}의 휴일 정보
-                </Typography>
-                {holidayDetails.map((holiday, idx) => (
-                  <Box key={idx} sx={{ marginBottom: '10px' }}>
-                    <Typography variant="h6">{holiday.holiday_name}</Typography>
-                    <Typography>국가: {holiday.country}</Typography>
-                  </Box>
-                ))}
-              </>
-            )}
-            {/* 공연과 휴일 정보가 없을 때 */}
-            {performanceDetails.length === 0 && holidayDetails.length === 0 && (
-              <Typography>해당 날짜에 공연 및 휴일 정보가 없습니다.</Typography>
-            )}
-          </>
-        )}
-      </Paper>
     </Box>
   );
 };
