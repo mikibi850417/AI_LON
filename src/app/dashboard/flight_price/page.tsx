@@ -31,6 +31,30 @@ const calcEndDate = (): string => {
   return end.toISOString().slice(0, 10);
 };
 
+// 공항 코드와 이름 매핑
+const airportNames: Record<string, string> = {
+  "CTS": "일본 삿포로 치토세 공항",
+  "NRT": "일본 도쿄 나리타 공항",
+  "HND": "일본 도쿄 하네다 공항",
+  "KIX": "일본 오사카 간사이 공항",
+  "FUK": "일본 후쿠오카 공항",
+  "HKG": "홍콩 국제공항",
+  "BKK": "태국 방콕 수완나품 공항",
+  "SGN": "베트남 호치민 떤선녓 공항",
+  "DPS": "인도네시아 발리 응우라라이 공항",
+  "SIN": "싱가포르 창이 공항",
+  "TPE": "대만 타이베이 타오위안 공항",
+  "MNL": "필리핀 마닐라 니노이 아키노 공항",
+  "CEB": "필리핀 세부 막탄 공항",
+  "BKI": "말레이시아 코타키나발루 공항",
+  "LAX": "미국 로스앤젤레스 국제공항",
+  "JFK": "미국 뉴욕 존 F. 케네디 공항",
+  "CDG": "프랑스 파리 샤를 드골 공항",
+  "FCO": "이탈리아 로마 피우미치노 공항",
+  "BCN": "스페인 바르셀로나 엘프라트 공항",
+  "IST": "터키 이스탄불 공항"
+};
+
 export default function FlightTrendChart() {
   // 시작 날짜: 사용자가 선택
   const [startDate, setStartDate] = useState(today);
@@ -214,7 +238,9 @@ export default function FlightTrendChart() {
                   label="출발지"
                   renderValue={(selected) => {
                     if ((selected as string[]).length === 0) return "전체";
-                    return (selected as string[]).join(", ");
+                    return (selected as string[])
+                      .map(code => airportNames[code] || code)
+                      .join(", ");
                   }}
                   sx={{ 
                     borderRadius: '8px',
@@ -233,9 +259,9 @@ export default function FlightTrendChart() {
                   <MenuItem value="All">
                     <em>전체</em>
                   </MenuItem>
-                  {departureOptions.map((dep) => (
+                  {Object.keys(airportNames).map((dep) => (
                     <MenuItem key={dep} value={dep}>
-                      {dep}
+                      {airportNames[dep]}
                     </MenuItem>
                   ))}
                 </Select>
@@ -296,7 +322,7 @@ export default function FlightTrendChart() {
             }}>
               <h2 className="text-lg font-semibold" style={{ color: 'white', display: 'flex', alignItems: 'center' }}>
                 <FlightIcon style={{ marginRight: '8px' }} /> 
-                항공요금 추세 그래프
+                AI 항공 요금 인사이트
               </h2>
             </Box>
             
@@ -452,7 +478,7 @@ export default function FlightTrendChart() {
             }}>
               <h2 className="text-lg font-semibold" style={{ color: 'white', display: 'flex', alignItems: 'center' }}>
                 <FlightIcon style={{ marginRight: '8px' }} /> 
-                출발지별 요금 추세
+                출발지별 편도 요금
               </h2>
             </Box>
             
@@ -488,8 +514,18 @@ export default function FlightTrendChart() {
                   const minFare = Math.min(...fares);
                   const yMin = Math.floor(minFare * 0.7);
                   const color = chartColors[index % chartColors.length];
+                  
+                  // 출발지가 하나만 선택되었는지 확인
+                  const isSingleSelection = Object.keys(groupedData).length === 1;
+                  
                   return (
-                    <Grid item xs={12} sm={6} md={4} key={dep}>
+                    <Grid 
+                      item 
+                      xs={12} 
+                      sm={isSingleSelection ? 12 : 6} 
+                      md={isSingleSelection ? 12 : 4} 
+                      key={dep}
+                    >
                       <Box
                         sx={{
                           border: '1px solid #e2e8f0',
@@ -515,71 +551,108 @@ export default function FlightTrendChart() {
                             backgroundColor: 'rgba(44, 62, 80, 0.05)'
                           }}
                         >
-                          {dep} (요금 추세)
+                          {airportNames[dep] || dep}
                         </Box>
-                        <Line
-                          data={{
-                            labels: labels,
-                            datasets: [
-                              {
-                                label: `${dep} 요금 추세`,
-                                data: fares,
-                                backgroundColor: color.backgroundColor,
-                                borderColor: color.borderColor,
-                                borderWidth: 2,
-                                fill: true,
-                                tension: 0.4,
-                                pointRadius: 2,
-                                pointBackgroundColor: "#fff",
-                              },
-                            ],
-                          }}
-                          options={{
-                            responsive: true,
-                            scales: {
-                              x: {
-                                title: { display: false },
-                                grid: {
-                                  display: false
+                        <Box sx={{ 
+                          height: isSingleSelection ? 400 : 250, 
+                          width: '100%' 
+                        }}>
+                          <Line
+                            data={{
+                              labels: labels,
+                              datasets: [
+                                {
+                                  label: `${airportNames[dep] || dep}`,
+                                  data: fares,
+                                  backgroundColor: color.backgroundColor,
+                                  borderColor: color.borderColor,
+                                  borderWidth: isSingleSelection ? 3 : 2,
+                                  fill: true,
+                                  tension: 0.4,
+                                  pointRadius: isSingleSelection ? 4 : 2,
+                                  pointBackgroundColor: "#fff",
                                 },
-                                ticks: {
-                                  color: '#64748b',
-                                  maxRotation: 45,
-                                  minRotation: 45
-                                }
-                              },
-                              y: {
-                                beginAtZero: false,
-                                min: yMin,
-                                title: { display: false },
-                                grid: {
-                                  color: 'rgba(0, 0, 0, 0.05)'
+                              ],
+                            }}
+                            options={{
+                              responsive: true,
+                              maintainAspectRatio: false,
+                              scales: {
+                                x: {
+                                  title: { 
+                                    display: isSingleSelection,
+                                    text: "날짜",
+                                    color: '#64748b'
+                                  },
+                                  grid: {
+                                    display: false
+                                  },
+                                  ticks: {
+                                    color: '#64748b',
+                                    maxRotation: 45,
+                                    minRotation: 45,
+                                    font: {
+                                      size: isSingleSelection ? 12 : 10
+                                    }
+                                  }
                                 },
-                                ticks: {
-                                  color: '#64748b'
-                                }
+                                y: {
+                                  beginAtZero: false,
+                                  min: yMin,
+                                  title: { 
+                                    display: isSingleSelection,
+                                    text: "요금(원)",
+                                    color: '#64748b'
+                                  },
+                                  grid: {
+                                    color: 'rgba(0, 0, 0, 0.05)'
+                                  },
+                                  ticks: {
+                                    color: '#64748b',
+                                    font: {
+                                      size: isSingleSelection ? 12 : 10
+                                    }
+                                  }
+                                },
                               },
-                            },
-                            plugins: {
-                              legend: { display: false },
-                              tooltip: {
-                                backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                                titleColor: '#2c3e50',
-                                bodyColor: '#2c3e50',
-                                borderColor: 'rgba(0, 0, 0, 0.1)',
-                                borderWidth: 1,
-                                padding: 8,
-                                boxPadding: 4,
-                                usePointStyle: true,
-                                callbacks: {
-                                  label: function(context) {
-                                    return `요금: ${context.parsed.y.toLocaleString()}원`;
+                              plugins: {
+                                legend: { 
+                                  display: isSingleSelection,
+                                  position: 'top',
+                                  labels: {
+                                    boxWidth: 12,
+                                    usePointStyle: true,
+                                    pointStyle: 'circle',
+                                    font: {
+                                      size: 14
+                                    }
+                                  }
+                                },
+                                tooltip: {
+                                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                                  titleColor: '#2c3e50',
+                                  bodyColor: '#2c3e50',
+                                  borderColor: 'rgba(0, 0, 0, 0.1)',
+                                  borderWidth: 1,
+                                  padding: isSingleSelection ? 10 : 8,
+                                  boxPadding: isSingleSelection ? 6 : 4,
+                                  usePointStyle: true,
+                                  titleFont: {
+                                    size: isSingleSelection ? 14 : 12
+                                  },
+                                  bodyFont: {
+                                    size: isSingleSelection ? 14 : 12
+                                  },
+                                  callbacks: {
+                                    label: function(context) {
+                                      return `요금: ${context.parsed.y.toLocaleString()}원`;
+                                    }
                                   }
                                 }
-                              }
-                            },
-                          }}
-                        />
+                              },
+                            }}
+                          />
+                        </Box>
                       </Box>
                     </Grid>
                   );

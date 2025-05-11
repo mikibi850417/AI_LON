@@ -13,6 +13,7 @@ import {
     Typography,
 } from "@mui/material";
 import { format, addDays } from "date-fns";
+import { scrollableTableContainerStyle, headerCellStyle, contentCellStyle } from "./tableStyles";
 import {
     ArrowUpRight,
     ArrowUp,
@@ -23,33 +24,6 @@ import {
 import { alpha } from "@mui/material/styles";
 import HotelIcon from '@mui/icons-material/Hotel';
 import FlightIcon from '@mui/icons-material/Flight';
-
-// Define styles directly in the component instead of importing
-const scrollableTableContainerStyle = {
-    mb: 4,
-    overflowX: "scroll",
-    minWidth: "100%",
-    "&::-webkit-scrollbar": { height: "8px" },
-    "&::-webkit-scrollbar-thumb": {
-        backgroundColor: "#888",
-        borderRadius: "4px",
-    },
-    "&::-webkit-scrollbar-track": {
-        backgroundColor: "#f0f0f0",
-    },
-};
-
-const headerCellStyle = {
-    whiteSpace: "nowrap",
-    minWidth: "160px",
-    fontWeight: "bold",
-};
-
-const contentCellStyle = {
-    whiteSpace: "nowrap",
-    minWidth: "100px",
-    textAlign: "center",
-};
 
 const getApiBaseUrl = (): string => process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 const getTrendIcon = (label: string | null) => {

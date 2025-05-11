@@ -5,15 +5,11 @@ import {
   Box,
   TextField,
   CircularProgress,
-  Typography,
   Grid,
   Button,
-  FormControl,
-  InputLabel,
 } from "@mui/material";
 import { Line } from "react-chartjs-2";
 import { Chart as ChartJS, registerables } from "chart.js";
-import HotelIcon from '@mui/icons-material/Hotel';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 
 ChartJS.register(...registerables);
@@ -114,37 +110,37 @@ export default function CompetitorHotelTrends() {
       : [];
 
   return (
-    <Box sx={{ 
-      padding: { xs: '16px', md: '24px' }, 
-      maxWidth: '1400px', 
-      margin: '0 auto', 
-      display: 'flex', 
-      flexDirection: 'column', 
+    <Box sx={{
+      padding: { xs: '16px', md: '24px' },
+      maxWidth: '1400px',
+      margin: '0 auto',
+      display: 'flex',
+      flexDirection: 'column',
       gap: '24px',
       minHeight: 'calc(100vh - 100px)'
     }}>
       {/* 헤더 섹션 */}
-      <h1 className="text-2xl font-bold mb-4" style={{ 
+      <h1 className="text-2xl font-bold mb-4" style={{
         color: '#2c3e50',
         padding: '16px 0',
         borderBottom: '2px solid #e2e8f0',
         display: 'flex',
         alignItems: 'center'
       }}>
-        <TrendingUpIcon style={{ marginRight: '8px', color: '#2c3e50' }} /> 
+        <TrendingUpIcon style={{ marginRight: '8px', color: '#2c3e50' }} />
         Hotel Trends
       </h1>
-      
+
       {/* 메인 콘텐츠 영역 */}
-      <Box sx={{ 
-        display: 'flex', 
-        flexDirection: 'column', 
+      <Box sx={{
+        display: 'flex',
+        flexDirection: 'column',
         gap: '24px',
         width: '100%'
       }}>
         {/* 필터 영역 */}
-        <Box sx={{ 
-          borderRadius: '16px', 
+        <Box sx={{
+          borderRadius: '16px',
           overflow: 'hidden',
           boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
           backgroundColor: 'white'
@@ -164,7 +160,7 @@ export default function CompetitorHotelTrends() {
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
                 InputLabelProps={{ shrink: true }}
-                sx={{ 
+                sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '8px',
                     '&:hover fieldset': {
@@ -182,7 +178,7 @@ export default function CompetitorHotelTrends() {
                 value={endDate}
                 InputProps={{ readOnly: true }}
                 InputLabelProps={{ shrink: true }}
-                sx={{ 
+                sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '8px',
                     '&:hover fieldset': {
@@ -194,13 +190,13 @@ export default function CompetitorHotelTrends() {
                   }
                 }}
               />
-              <Button 
-                variant="contained" 
+              <Button
+                variant="contained"
                 onClick={() => {
                   fetchHotelPrices(startDate, endDate);
                   fetchHotelPCA(startDate, endDate);
                 }}
-                sx={{ 
+                sx={{
                   backgroundColor: '#2c3e50',
                   '&:hover': {
                     backgroundColor: '#34495e',
@@ -225,14 +221,14 @@ export default function CompetitorHotelTrends() {
 
         {/* PCA 트렌드 차트 */}
         {pcaData.dates.length > 0 && (
-          <Box sx={{ 
-            borderRadius: '16px', 
+          <Box sx={{
+            borderRadius: '16px',
             overflow: 'hidden',
             boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
             backgroundColor: 'white'
           }}>
-            <Box sx={{ 
-              p: 3, 
+            <Box sx={{
+              p: 3,
               borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
               display: 'flex',
               justifyContent: 'space-between',
@@ -241,11 +237,11 @@ export default function CompetitorHotelTrends() {
               color: 'white'
             }}>
               <h2 className="text-lg font-semibold" style={{ color: 'white', display: 'flex', alignItems: 'center' }}>
-                <TrendingUpIcon style={{ marginRight: '8px' }} /> 
-                주요 호텔 추세 그래프
+                <TrendingUpIcon style={{ marginRight: '8px' }} />
+                AI 기반 주요 호텔 인사이트
               </h2>
             </Box>
-            
+
             <Box sx={{ p: 3 }}>
               <Line
                 data={{
@@ -263,18 +259,18 @@ export default function CompetitorHotelTrends() {
                         const chart = context.chart;
                         const { ctx, chartArea } = chart;
                         if (!chartArea) return 'rgba(52, 152, 219, 0.2)'; // 기본값 반환
-                        
+
                         // y축 0 위치 계산
                         const yScale = chart.scales.y;
                         const zeroY = yScale.getPixelForValue(0);
-                        
+
                         // 그라데이션 생성
                         const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
                         gradient.addColorStop(0, 'rgba(231, 76, 60, 0.2)'); // 위쪽 (음수값) - 빨간색
                         gradient.addColorStop(yScale.getPixelForValue(0) / chartArea.bottom, 'rgba(231, 76, 60, 0.05)');
                         gradient.addColorStop(yScale.getPixelForValue(0) / chartArea.bottom, 'rgba(52, 152, 219, 0.05)');
                         gradient.addColorStop(1, 'rgba(52, 152, 219, 0.2)'); // 아래쪽 (양수값) - 파란색
-                        
+
                         return gradient;
                       },
                       fill: true,
@@ -293,7 +289,7 @@ export default function CompetitorHotelTrends() {
                           // 선 색상도 값에 따라 변경
                           const p0 = context.p0.parsed;
                           const p1 = context.p1.parsed;
-                          
+
                           // 두 점이 모두 0보다 크거나 같으면 파란색
                           if (p0.y >= 0 && p1.y >= 0) return '#3498db';
                           // 두 점이 모두 0보다 작으면 빨간색
@@ -363,9 +359,9 @@ export default function CompetitorHotelTrends() {
                 }}
               />
             </Box>
-            
-            <Box sx={{ 
-              p: 2, 
+
+            <Box sx={{
+              p: 2,
               borderTop: '1px solid rgba(0, 0, 0, 0.05)',
               backgroundColor: '#f8fafc',
               display: 'flex',
@@ -381,14 +377,14 @@ export default function CompetitorHotelTrends() {
 
         {/* 개별 호텔 가격 차트 */}
         {Object.keys(hotelData).length > 0 && (
-          <Box sx={{ 
-            borderRadius: '16px', 
+          <Box sx={{
+            borderRadius: '16px',
             overflow: 'hidden',
             boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
             backgroundColor: 'white'
           }}>
-            <Box sx={{ 
-              p: 3, 
+            <Box sx={{
+              p: 3,
               borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
               display: 'flex',
               justifyContent: 'space-between',
@@ -397,13 +393,21 @@ export default function CompetitorHotelTrends() {
               color: 'white'
             }}>
               <h2 className="text-lg font-semibold" style={{ color: 'white', display: 'flex', alignItems: 'center' }}>
-                <TrendingUpIcon style={{ marginRight: '8px' }} /> 
-                주요 호텔별 요금 추세
+                <TrendingUpIcon style={{ marginRight: '8px' }} />
+                주요 호텔별 요금
               </h2>
             </Box>
-            
+
             <Box sx={{ p: 3 }}>
-              <Grid container spacing={2}>
+              <Grid container spacing={2} sx={{
+                // 그리드 컨테이너 스타일 수정
+                margin: 0,
+                width: '100%',
+                '& .MuiGrid-item': {
+                  padding: '8px', // 더 명확한 패딩 적용
+                  boxSizing: 'border-box'
+                }
+              }}>
                 {Object.keys(hotelData).map((hotel, index) => {
                   const color = chartColors[index % chartColors.length];
                   return (
@@ -414,6 +418,7 @@ export default function CompetitorHotelTrends() {
                           p: 2,
                           borderRadius: '12px',
                           height: '100%',
+                          backgroundColor: '#ffffff', // 배경색 명시적 설정
                           transition: 'all 0.3s ease',
                           '&:hover': {
                             boxShadow: '0 8px 16px rgba(0, 0, 0, 0.1)',
@@ -433,7 +438,7 @@ export default function CompetitorHotelTrends() {
                             backgroundColor: 'rgba(44, 62, 80, 0.05)'
                           }}
                         >
-                          {hotel} (가격 추세)
+                          {hotel}
                         </Box>
                         <Line
                           data={{
@@ -492,7 +497,7 @@ export default function CompetitorHotelTrends() {
                                 boxPadding: 4,
                                 usePointStyle: true,
                                 callbacks: {
-                                  label: function(context) {
+                                  label: function (context) {
                                     return `가격: ${context.parsed.y.toLocaleString()}원`;
                                   }
                                 }
@@ -506,9 +511,9 @@ export default function CompetitorHotelTrends() {
                 })}
               </Grid>
             </Box>
-            
-            <Box sx={{ 
-              p: 2, 
+
+            <Box sx={{
+              p: 2,
               borderTop: '1px solid rgba(0, 0, 0, 0.05)',
               backgroundColor: '#f8fafc',
               display: 'flex',
@@ -545,8 +550,8 @@ const createGradient = (
     p0: { x: number; y: number; parsed: { y: number } };
     p1: { x: number; y: number; parsed: { y: number } };
     chart: { ctx: CanvasRenderingContext2D }
-  }, 
-  colorStart: string, 
+  },
+  colorStart: string,
   colorEnd: string
 ): CanvasGradient => {
   const { p0, p1 } = context;
