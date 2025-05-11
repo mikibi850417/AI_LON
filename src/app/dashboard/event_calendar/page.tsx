@@ -193,7 +193,7 @@ const EventCalendarGrid = () => {
     const dateStr = formatDate(date);
     const eventCount = groupedEvents[dateStr]?.length || 0;
     const holidayCount = groupedHolidays[dateStr]?.length || 0;
-    
+
     return (
       <Box className="tile-content">
         {eventCount > 0 && (
@@ -219,36 +219,36 @@ const EventCalendarGrid = () => {
   };
 
   return (
-    <Box sx={{ 
-      padding: { xs: '16px', md: '24px' }, 
-      maxWidth: '1400px', 
-      margin: '0 auto', 
-      display: 'flex', 
-      flexDirection: 'column', 
+    <Box sx={{
+      padding: { xs: '16px', md: '24px' },
+      maxWidth: '1400px',
+      margin: '0 auto',
+      display: 'flex',
+      flexDirection: 'column',
       gap: '24px',
       minHeight: 'calc(100vh - 100px)'
     }}>
       {/* 헤더 섹션 - 대시보드와 일관된 스타일로 변경 */}
-      <h1 className="text-2xl font-bold mb-4" style={{ 
+      <h1 className="text-2xl font-bold mb-4" style={{
         color: '#2c3e50',
         padding: '16px 0',
         borderBottom: '2px solid #e2e8f0',
         display: 'flex',
         alignItems: 'center'
       }}>
-        <CalendarTodayIcon style={{ marginRight: '8px', color: '#2c3e50' }} /> 
+        <CalendarTodayIcon style={{ marginRight: '8px', color: '#2c3e50' }} />
         Event Calendar
       </h1>
-      
+
       {/* 메인 콘텐츠 영역 */}
-      <Box sx={{ 
-        display: 'flex', 
-        flexDirection: { xs: 'column', md: 'row' }, 
+      <Box sx={{
+        display: 'flex',
+        flexDirection: { xs: 'column', md: 'row' },
         gap: '24px',
         width: '100%'
       }}>
         {/* 캘린더 영역 */}
-        <Box sx={{ 
+        <Box sx={{
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
@@ -257,8 +257,8 @@ const EventCalendarGrid = () => {
           boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
           backgroundColor: 'white'
         }}>
-          <Box sx={{ 
-            p: 3, 
+          <Box sx={{
+            p: 3,
             borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
             display: 'flex',
             justifyContent: 'space-between',
@@ -271,8 +271,8 @@ const EventCalendarGrid = () => {
               공연 일정
             </Typography>
           </Box>
-          
-          <Box sx={{ 
+
+          <Box sx={{
             position: 'relative',
             flex: 1,
             display: 'flex',
@@ -309,11 +309,12 @@ const EventCalendarGrid = () => {
               }}
               tileContent={renderTileContent}
               className="custom-calendar"
+              locale="ko-KR" // Explicitly set the locale
             />
           </Box>
-          
-          <Box sx={{ 
-            p: 2, 
+
+          <Box sx={{
+            p: 2,
             borderTop: '1px solid rgba(0, 0, 0, 0.05)',
             display: 'flex',
             justifyContent: 'space-between',
@@ -334,11 +335,11 @@ const EventCalendarGrid = () => {
             </Typography>
           </Box>
         </Box>
-        
+
         {/* 공연 및 휴일 상세 정보 영역 */}
-        <Box 
-          sx={{ 
-            flex: 1, 
+        <Box
+          sx={{
+            flex: 1,
             display: 'flex',
             flexDirection: 'column',
             borderRadius: '16px',
@@ -347,8 +348,8 @@ const EventCalendarGrid = () => {
             backgroundColor: 'white'
           }}
         >
-          <Box sx={{ 
-            p: 3, 
+          <Box sx={{
+            p: 3,
             borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
             display: 'flex',
             justifyContent: 'space-between',
@@ -360,11 +361,11 @@ const EventCalendarGrid = () => {
               {selectedDate} 상세 정보
             </Typography>
           </Box>
-          
+
           {/* 탭 버튼 */}
-          <Box sx={{ 
-            display: 'flex', 
-            gap: 2, 
+          <Box sx={{
+            display: 'flex',
+            gap: 2,
             p: 3,
             borderBottom: '1px solid #e2e8f0',
           }}>
@@ -373,7 +374,7 @@ const EventCalendarGrid = () => {
               color="primary"
               startIcon={<EventIcon />}
               onClick={() => handleTabChange('events')}
-              sx={{ 
+              sx={{
                 borderRadius: '8px',
                 fontWeight: 500,
                 flex: 1,
@@ -385,13 +386,13 @@ const EventCalendarGrid = () => {
             >
               공연 목록 ({performanceDetails.length})
             </Button>
-            
+
             <Button
               variant={activeTab === 'holidays' ? 'contained' : 'outlined'}
               color="error"
               startIcon={<BeachAccessIcon />}
               onClick={() => handleTabChange('holidays')}
-              sx={{ 
+              sx={{
                 borderRadius: '8px',
                 fontWeight: 500,
                 flex: 1,
@@ -404,10 +405,10 @@ const EventCalendarGrid = () => {
               휴일 정보 ({holidayDetails.length})
             </Button>
           </Box>
-          
+
           {/* 콘텐츠 영역 */}
-          <Box sx={{ 
-            flex: 1, 
+          <Box sx={{
+            flex: 1,
             overflow: 'auto',
             display: 'flex',
             flexDirection: 'column',
@@ -426,10 +427,10 @@ const EventCalendarGrid = () => {
                     {performanceDetails.length > 0 ? (
                       <Box>
                         {performanceDetails.map((detail) => (
-                          <Box 
-                            key={detail.id} 
+                          <Box
+                            key={detail.id}
                             className="event-card"
-                            sx={{ 
+                            sx={{
                               mb: 2,
                               borderLeft: '4px solid #2c3e50',
                               backgroundColor: '#f8fafc',
@@ -443,9 +444,9 @@ const EventCalendarGrid = () => {
                               }
                             }}
                           >
-                            <Typography 
-                              variant="subtitle1" 
-                              sx={{ 
+                            <Typography
+                              variant="subtitle1"
+                              sx={{
                                 fontWeight: 600,
                                 mb: 1,
                                 color: '#2c3e50'
@@ -453,36 +454,36 @@ const EventCalendarGrid = () => {
                             >
                               {detail.name}
                             </Typography>
-                            
+
                             <Divider sx={{ my: 1.5, opacity: 0.6 }} />
-                            
-                            <Box sx={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
+
+                            <Box sx={{
+                              display: 'flex',
+                              alignItems: 'center',
                               gap: 1,
                               mb: 1
                             }}>
-                              <LocationOnIcon 
-                                fontSize="small" 
-                                sx={{ color: '#3498db' }} 
+                              <LocationOnIcon
+                                fontSize="small"
+                                sx={{ color: '#3498db' }}
                               />
                               <Typography variant="body2" sx={{ color: '#34495e' }}>
                                 {detail.venue || '장소 정보 없음'}
                               </Typography>
                             </Box>
-                            
-                            <Box sx={{ 
-                              display: 'flex', 
-                              alignItems: 'flex-start', 
-                              gap: 1 
+
+                            <Box sx={{
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: 1
                             }}>
-                              <PeopleIcon 
-                                fontSize="small" 
-                                sx={{ color: '#9b59b6', mt: 0.5 }} 
+                              <PeopleIcon
+                                fontSize="small"
+                                sx={{ color: '#9b59b6', mt: 0.5 }}
                               />
-                              <Typography 
-                                variant="body2" 
-                                sx={{ 
+                              <Typography
+                                variant="body2"
+                                sx={{
                                   lineHeight: 1.4,
                                   color: '#34495e'
                                 }}
@@ -494,9 +495,9 @@ const EventCalendarGrid = () => {
                         ))}
                       </Box>
                     ) : (
-                      <Box 
-                        sx={{ 
-                          display: 'flex', 
+                      <Box
+                        sx={{
+                          display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -512,17 +513,17 @@ const EventCalendarGrid = () => {
                     )}
                   </>
                 )}
-                
+
                 {/* 휴일 정보 탭 */}
                 {activeTab === 'holidays' && (
                   <>
                     {holidayDetails.length > 0 ? (
                       <Box>
                         {holidayDetails.map((holiday, idx) => (
-                          <Box 
-                            key={idx} 
+                          <Box
+                            key={idx}
                             className="holiday-card"
-                            sx={{ 
+                            sx={{
                               mb: 2,
                               borderLeft: '4px solid #e74c3c',
                               backgroundColor: '#f8fafc',
@@ -536,9 +537,9 @@ const EventCalendarGrid = () => {
                               }
                             }}
                           >
-                            <Typography 
-                              variant="subtitle1" 
-                              sx={{ 
+                            <Typography
+                              variant="subtitle1"
+                              sx={{
                                 fontWeight: 600,
                                 mb: 1,
                                 color: '#2c3e50'
@@ -546,12 +547,12 @@ const EventCalendarGrid = () => {
                             >
                               {holiday.holiday_name}
                             </Typography>
-                            
+
                             <Divider sx={{ my: 1.5, opacity: 0.6 }} />
-                            
-                            <Typography 
-                              variant="body2" 
-                              sx={{ 
+
+                            <Typography
+                              variant="body2"
+                              sx={{
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: 1,
@@ -561,10 +562,10 @@ const EventCalendarGrid = () => {
                               <span role="img" aria-label="country" style={{ fontSize: '1.2rem' }}>🌍</span>
                               국가: {holiday.country}
                             </Typography>
-                            
-                            <Typography 
-                              variant="body2" 
-                              sx={{ 
+
+                            <Typography
+                              variant="body2"
+                              sx={{
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: 1,
@@ -579,9 +580,9 @@ const EventCalendarGrid = () => {
                         ))}
                       </Box>
                     ) : (
-                      <Box 
-                        sx={{ 
-                          display: 'flex', 
+                      <Box
+                        sx={{
+                          display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -600,9 +601,9 @@ const EventCalendarGrid = () => {
               </>
             )}
           </Box>
-          
-          <Box sx={{ 
-            p: 2, 
+
+          <Box sx={{
+            p: 2,
             borderTop: '1px solid rgba(0, 0, 0, 0.05)',
             backgroundColor: '#f8fafc',
             display: 'flex',

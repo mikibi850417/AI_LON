@@ -327,7 +327,7 @@ const WeatherStatusPage = () => {
                 overflowY: "auto"   // 세로 스크롤 활성화
               }}
             >
-              <Table size="small" stickyHeader> {/* stickyHeader 추가 */}
+              <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow sx={{ bgcolor: "rgba(44, 62, 80, 0.05)" }}>
                     <TableCell
