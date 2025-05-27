@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient';
-import { useRouter } from 'next/navigation';
-import { Box, TextField, Button, Chip, Typography } from "@mui/material";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Box, TextField, Button, Chip, Typography, Autocomplete } from "@mui/material";
 import { GoogleMap, useLoadScript } from "@react-google-maps/api";
+import { supabase } from "@/lib/supabaseClient";
+import { useRouter } from "next/navigation";
 
 const mapContainerStyle = { width: "100%", height: "500px" };
 const defaultCenter = { lat: 37.5665, lng: 126.9780 };
@@ -13,6 +13,11 @@ const libraries: ("places")[] = ["places"];
 interface CustomMapMouseEvent extends google.maps.MapMouseEvent {
   placeId?: string;
 }
+
+// API 베이스 URL 가져오기 함수 수정
+const getApiBaseUrl = (): string => {
+  return process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+};
 
 // Daum 우편번호 타입 정의 추가
 declare global {
@@ -23,15 +28,8 @@ declare global {
   }
 }
 
-// API 베이스 URL 가져오기
-const getApiBaseUrl = (): string => {
-  return process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
-};
-
-const UserSettingsForm = () => {
+export default function OnboardingPage() {
   const router = useRouter();
-  const dashboardPath = process.env.NEXT_PUBLIC_DASHBOARD_PATH || "/dashboard";
-
 
   // 사용자 정보 상태 (ID, 이메일, provider)
   const [userId, setUserId] = useState<string>("");
@@ -41,16 +39,22 @@ const UserSettingsForm = () => {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [marker, setMarker] = useState<google.maps.Marker | null>(null);
   const [hotelAddress, setHotelAddress] = useState("");
-  const [hotelName, setHotelName] = useState(""); // Initialize with empty string
+  const [hotelName, setHotelName] = useState("");
   const [hotelLatitude, setHotelLatitude] = useState<number | null>(null);
   const [hotelLongitude, setHotelLongitude] = useState<number | null>(null);
   // 경쟁호텔 선택 (최대 5개)
   const [selectedCompetitorHotels, setSelectedCompetitorHotels] = useState<string[]>([]);
   const [error, setError] = useState("");
 
+  // 호텔 검색 관련 상태 추가
+  const [searchValue, setSearchValue] = useState<string>("");
+  const [searchResults, setSearchResults] = useState<google.maps.places.AutocompletePrediction[]>([]);
+  const autocompleteRef = useRef<google.maps.places.AutocompleteService | null>(null);
+  const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
+
   // 원본 데이터 상태 (변경 여부 비교용)
   const [originalHotelAddress, setOriginalHotelAddress] = useState("");
-  const [originalHotelName, setOriginalHotelName] = useState(""); // Initialize with empty string
+  const [originalHotelName, setOriginalHotelName] = useState("");
   const [originalCompetitorHotels, setOriginalCompetitorHotels] = useState<string[]>([]);
 
   const { isLoaded, loadError } = useLoadScript({
@@ -58,13 +62,27 @@ const UserSettingsForm = () => {
     libraries,
   });
 
+  // Initialize Google Maps Autocomplete service
+  useEffect(() => {
+    if (isLoaded && window.google) {
+      autocompleteRef.current = new google.maps.places.AutocompleteService();
+    }
+  }, [isLoaded]);
+
+  // Initialize Google Maps Places service
+  useEffect(() => {
+    if (map) {
+      placesServiceRef.current = new google.maps.places.PlacesService(map);
+    }
+  }, [map]);
+
   // 로그인 세션 확인 및 사용자 정보 저장
   useEffect(() => {
     const fetchSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session && session.user) {
         setUserId(session.user.id);
-        setUserEmail(session.user.email || "");
+        setUserEmail(session.user.email || ""); // null/undefined 처리
         setUserProvider(session.user.app_metadata.provider || "email");
       } else {
         router.push("/auth/login");
@@ -74,54 +92,82 @@ const UserSettingsForm = () => {
   }, [router]);
 
   // 기존 사용자 정보 가져오기 (competitor_hotels, hotel_address, hotel_name)
-  // ① 사용자 정보 및 주소정보(user_address_info)·users 테이블 초기 로드
   useEffect(() => {
     const fetchUserData = async () => {
-      // 1) 세션에서 user.id 가져오기
-      const { data: { session } } = await supabase.auth.getSession();
-      const user = session?.user;
-      if (!user) return;
+      try {
+        console.log("사용자 데이터 조회 시작, userId:", userId);
 
-      const uid = user.id;
-      setUserId(uid);
+        if (!userId) {
+          console.log("userId가 없어 데이터 조회를 건너뜁니다.");
+          return;
+        }
 
-      // 2) 주소 후처리 테이블에서 hotel_address·위경도 불러오기
-      const { data: addrInfo, error: addrErr } = await supabase
-        .from("user_address_info")
-        .select("address, latitude, longitude")
-        .eq("user_id", uid)
-        .single();
-      if (!addrErr && addrInfo) {
-        setHotelAddress(addrInfo.address);
-        setOriginalHotelAddress(addrInfo.address);
-        setHotelLatitude(addrInfo.latitude);
-        setHotelLongitude(addrInfo.longitude);
-      }
+        // 1. users 테이블에서 competitor_hotels, hotel_name 조회
+        const { data: userData, error: userError } = await supabase
+          .from("users")
+          .select("competitor_hotels, hotel_name")
+          .eq("id", userId)
+          .single();
 
-      // 3) users 테이블에서 hotel_name·competitor_hotels 불러오기
-      const { data: userData, error: userErr } = await supabase
-        .from("users")
-        .select("hotel_name, competitor_hotels")
-        .eq("id", uid)
-        .single();
-      if (!userErr && userData) {
-        // Ensure hotelName is set to empty string if null/undefined from DB
-        setHotelName(userData.hotel_name || "");
-        setOriginalHotelName(userData.hotel_name || "");
-        setSelectedCompetitorHotels(userData.competitor_hotels || []);
-        setOriginalCompetitorHotels(userData.competitor_hotels || []);
-      } else if (userErr) {
-        // Handle potential error fetching user data, maybe set defaults
-        console.error("Error fetching user details:", userErr);
-        setHotelName(""); // Default to empty string on error too
-        setOriginalHotelName("");
-        setSelectedCompetitorHotels([]);
-        setOriginalCompetitorHotels([]);
+        if (userError) {
+          console.error("사용자 데이터 조회 에러:", userError);
+          return;
+        }
+
+        console.log("users 테이블 조회 결과:", userData);
+
+        if (userData) {
+          if (userData.competitor_hotels) {
+            setSelectedCompetitorHotels(userData.competitor_hotels);
+            setOriginalCompetitorHotels(userData.competitor_hotels);
+          }
+          if (userData.hotel_name) {
+            setHotelName(userData.hotel_name);
+            setOriginalHotelName(userData.hotel_name);
+          }
+        }
+
+        // 2. user_address_info 테이블에서 address, latitude, longitude 조회
+        const { data: addressData, error: addressError } = await supabase
+          .from("user_address_info")
+          .select("address, latitude, longitude")
+          .eq("user_id", userId)
+          .single();
+
+        if (addressError) {
+          // PostgreSQL 코드 P0002는 "no_data_found" 오류로, 데이터가 없는 경우입니다.
+          // 이 경우는 정상적인 상황일 수 있으므로 무시합니다.
+          if (addressError.code !== "PGRST116") {
+            console.error("주소 데이터 조회 에러:", addressError);
+          } else {
+            console.log("주소 데이터가 아직 없습니다.");
+          }
+          return;
+        }
+
+        console.log("user_address_info 테이블 조회 결과:", addressData);
+
+        if (addressData) {
+          if (addressData.address) {
+            setHotelAddress(addressData.address);
+            setOriginalHotelAddress(addressData.address);
+          }
+          if (addressData.latitude) {
+            setHotelLatitude(addressData.latitude);
+          }
+          if (addressData.longitude) {
+            setHotelLongitude(addressData.longitude);
+          }
+        }
+      } catch (error) {
+        console.error("데이터 조회 중 예외 발생:", error);
       }
     };
 
-    fetchUserData();
-  }, []); // Keep dependency array as is unless uid changes trigger refetch
+    if (userId) {
+      fetchUserData();
+    }
+  }, [userId]);
 
   // Daum 우편번호 스크립트 동적 로드
   useEffect(() => {
@@ -172,96 +218,183 @@ const UserSettingsForm = () => {
   };
 
   // 지도 클릭 시 경쟁호텔 선택 (최대 5개) 및 토글 제거 처리
-  const handleMapClick = (e: google.maps.MapMouseEvent) => {
-    const customEvent = e as CustomMapMouseEvent;
-    if (customEvent.placeId && map) {
-      const service = new google.maps.places.PlacesService(map);
-      service.getDetails(
-        {
-          placeId: customEvent.placeId,
-          fields: ["name", "types"],
-        },
-        (place, status) => {
-          if (
-            status === google.maps.places.PlacesServiceStatus.OK &&
-            place &&
-            place.types &&
-            place.name
-          ) {
-            if (place.types.includes("lodging")) {
-              // 토글: 이미 선택된 호텔이면 제거
-              if (selectedCompetitorHotels.includes(place.name)) {
-                setSelectedCompetitorHotels((prev) =>
-                  prev.filter((item) => item !== place.name)
-                );
-              } else {
-                // 최대 5개 선택 제한
-                if (selectedCompetitorHotels.length >= 5) {
-                  const infoWindow = new google.maps.InfoWindow({
-                    content:
-                      "<div style='color:red; font-weight:bold;'>최대 5개만 선택 가능합니다.</div>",
-                    position: customEvent.latLng,
-                  });
-                  infoWindow.open(map);
-                  setTimeout(() => infoWindow.close(), 2000);
-                  return;
-                }
-                // 타입 안전하게 수정
-                setSelectedCompetitorHotels((prev) => {
-                  if (place.name) {
-                    return [...prev, place.name];
+  const handleMapClick = useCallback(
+    (e: google.maps.MapMouseEvent) => {
+      const customEvent = e as CustomMapMouseEvent;
+      if (customEvent.placeId && map) {
+        const service = new google.maps.places.PlacesService(map);
+        service.getDetails(
+          {
+            placeId: customEvent.placeId,
+            fields: ["name", "types"],
+          },
+          (place, status) => {
+            if (
+              status === google.maps.places.PlacesServiceStatus.OK &&
+              place &&
+              place.types &&
+              place.name // 이름이 존재하는지 확인
+            ) {
+              const hotelName = place.name; // 로컬 변수에 할당하여 타입 안정성 확보
+
+              if (place.types.includes("lodging")) {
+                // 토글: 이미 선택된 호텔이면 제거
+                if (selectedCompetitorHotels.includes(hotelName)) {
+                  setSelectedCompetitorHotels((prev) =>
+                    prev.filter((item) => item !== hotelName)
+                  );
+                } else {
+                  // 최대 5개 선택 제한
+                  if (selectedCompetitorHotels.length >= 5) {
+                    const infoWindow = new google.maps.InfoWindow({
+                      content:
+                        "<div style='color:red; font-weight:bold;'>최대 5개만 선택 가능합니다.</div>",
+                      position: customEvent.latLng,
+                    });
+                    infoWindow.open(map);
+                    setTimeout(() => infoWindow.close(), 2000);
+                    return;
                   }
-                  return [...prev];
-                });
+                  // 타입 안전하게 수정
+                  setSelectedCompetitorHotels((prev) => [...prev, hotelName]);
+                }
               }
             }
           }
-        }
-      );
+        );
+      }
+    },
+    [map, selectedCompetitorHotels]
+  );
+
+  const onMapLoad = useCallback((mapInstance: google.maps.Map) => {
+    setMap(mapInstance);
+  }, []);
+
+  // 검색 결과 처리 함수 추가
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    setSearchValue(value);
+    if (value.length > 2 && autocompleteRef.current && map) {
+      const center = map.getCenter();
+      if (center) {
+        autocompleteRef.current.getPlacePredictions(
+          {
+            input: value,
+            types: ["lodging"],
+            location: new google.maps.LatLng(center.lat(), center.lng()),
+            radius: 50000,
+          },
+          (predictions, status) => {
+            if (
+              status === google.maps.places.PlacesServiceStatus.OK &&
+              predictions
+            ) {
+              setSearchResults(predictions);
+            } else {
+              setSearchResults([]);
+            }
+          }
+        );
+      }
+    } else {
+      setSearchResults([]);
     }
   };
 
-  const onMapLoad = (mapInstance: google.maps.Map) => {
-    setMap(mapInstance);
+  // 호텔 상세 정보 가져오기
+  const getPlaceDetails = (placeId: string) => {
+    if (!placesServiceRef.current) return;
+    placesServiceRef.current.getDetails(
+      {
+        placeId: placeId,
+        fields: ["name", "geometry", "types"],
+      },
+      (place, status) => {
+        if (
+          status === google.maps.places.PlacesServiceStatus.OK &&
+          place &&
+          place.name &&
+          place.geometry?.location
+        ) {
+          const hotelName = place.name; // 로컬 변수에 할당하여 타입 안정성 확보
+
+          // 최대 5개 선택 제한
+          if (selectedCompetitorHotels.length >= 5 && !selectedCompetitorHotels.includes(hotelName)) {
+            setError("경쟁 호텔은 최대 5개까지만 선택 가능합니다.");
+            setTimeout(() => setError(""), 3000);
+            return;
+          }
+
+          // 토글: 이미 선택된 호텔이면 제거, 아니면 추가
+          setSelectedCompetitorHotels((prev) => {
+            if (prev.includes(hotelName)) {
+              return prev.filter(item => item !== hotelName);
+            } else {
+              return [...prev, hotelName];
+            }
+          });
+
+          // 지도 이동
+          if (map && place.geometry?.location) {
+            map.panTo(place.geometry.location);
+            map.setZoom(18);
+          }
+        }
+      }
+    );
   };
 
-  // 폼 제출: 변경된 부분만 업데이트 (분리된 로직)
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setError(""); // Clear previous errors
-    // setLoading(true); // Assuming you have loading state
+  // 검색 결과 선택 처리
+  const handleSearchResultSelect = (prediction: google.maps.places.AutocompletePrediction) => {
+    if (prediction.place_id) {
+      getPlaceDetails(prediction.place_id);
+    }
+    setSearchValue("");
+    setSearchResults([]);
+  };
 
-    let userId = ""; // Initialize userId
-    let currentError = ""; // Temporary variable to hold error message
+  // 호텔 제거 핸들러
+  const handleRemoveHotel = (hotel: string) => {
+    setSelectedCompetitorHotels((prev) => {
+      return prev.filter(item => item !== hotel);
+    });
+  };
+
+  // 내 호텔 정보만 저장하는 함수 수정
+  const saveMyHotelInfo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (!hotelAddress || !hotelName) {
+      setError("호텔 주소와 호텔 이름을 입력해주세요.");
+      setTimeout(() => setError(""), 3000);
+      return;
+    }
+
+    if (!userId) {
+      setError("사용자 정보를 확인할 수 없습니다.");
+      return;
+    }
 
     try {
-      // 1. Get current user ID
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      console.log("내 호텔 정보 저장 시작:", {
+        userId,
+        hotelAddress,
+        hotelName,
+        hotelLatitude,
+        hotelLongitude
+      });
 
-      if (userError || !user) {
-        console.error("Error fetching user:", userError);
-        currentError = "사용자 정보를 가져올 수 없습니다. 다시 로그인해주세요.";
-        setError(currentError);
-        // setLoading(false);
-        return;
-      }
-      userId = user.id; // Assign userId
-
-      // --- Call FastAPI to get region and location_code ---
+      // 지역 및 위치 코드 정보 가져오기 (FastAPI 호출)
       let region = "UNKNOWN";
       let location_code = "UNKNOWN";
-      const apiBaseUrl = getApiBaseUrl(); // Get base URL
-      const apiUrl = `${apiBaseUrl}/api/onboarding/input-postprocess/address`;
-
-      if (!hotelAddress) {
-        currentError = "호텔 주소를 입력해주세요.";
-        setError(currentError);
-        return;
-      }
 
       try {
-        console.log(`Calling FastAPI endpoint: ${apiUrl} with address: ${hotelAddress}`);
-        const response = await fetch(apiUrl, {
+        const apiBaseUrl = getApiBaseUrl();
+        console.log("API Base URL:", apiBaseUrl); // URL 로깅 추가
+
+        const response = await fetch(`${apiBaseUrl}/api/onboarding/input-postprocess/address`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -269,165 +402,169 @@ const UserSettingsForm = () => {
           body: JSON.stringify({ address: hotelAddress }),
         });
 
-        if (!response.ok) {
+        console.log("API Response Status:", response.status); // 응답 상태 로깅 추가
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log("주소 처리 API 응답:", result);
+          location_code = result.location || "UNKNOWN";
+          region = result.region || "UNKNOWN";
+        } else {
           const errorText = await response.text();
-          console.error(`FastAPI Error ${response.status}: ${errorText}`);
-          currentError = `주소 처리 중 오류 발생 (서버: ${response.status})`;
-          setError(currentError);
-          return; // Stop execution if API call fails
+          console.error("주소 처리 API 오류:", response.status, errorText);
+          throw new Error(`API 요청 실패: ${response.status} ${errorText}`);
         }
-
-        const result = await response.json();
-        console.log("FastAPI Response:", result);
-
-        // Assuming API returns 'location' for location_code and 'region' for region
-        location_code = result.location || "UNKNOWN";
-        region = result.region || "UNKNOWN";
-
-        // Optional: Add length check/truncation if needed, though API should ideally handle this
-        // const MAX_LENGTH = 6;
-        // location_code = location_code.substring(0, MAX_LENGTH);
-        // region = region.substring(0, MAX_LENGTH);
-
       } catch (apiError: any) {
-        console.error("Error calling FastAPI:", apiError);
-        currentError = `주소 처리 API 호출 중 오류 발생: ${apiError.message || '네트워크 오류'}`;
-        setError(currentError);
-        return; // Stop execution on API call error
+        console.error("주소 처리 API 호출 실패:", apiError);
+        throw new Error(`주소 처리 API 호출 실패: ${apiError.message || '알 수 없는 오류'}`);
       }
 
-      console.log("Received region from API:", region);
-      console.log("Received location_code from API:", location_code);
-      // --- End FastAPI call ---
+      // 주소 정보 업데이트
+      const { error: addressError } = await supabase
+        .from("user_address_info")
+        .upsert({
+          user_id: userId,
+          address: hotelAddress,
+          latitude: hotelLatitude,
+          longitude: hotelLongitude,
+          location_code: location_code,
+          region: region
+        }, { onConflict: 'user_id' });
 
-
-      // --- Operation 1: Upsert Address Info ---
-      const addressPayload = {
-        user_id: userId,
-        address: hotelAddress, // Use the original address submitted by user
-        latitude: hotelLatitude,
-        longitude: hotelLongitude,
-        location_code: location_code, // Use value from API
-        region: region, // Use value from API
-      };
-
-      console.log("Attempting to upsert address payload:", addressPayload);
-      if (!addressPayload.user_id) {
-        // This check might be redundant now but kept for safety
-        console.error("USER ID IS MISSING for address upsert!");
-        currentError = "사용자 ID가 누락되었습니다.";
-        setError(currentError);
-        // setLoading(false);
-        return;
-      }
-      // Add validation for API-derived region and location_code before upsert
-      if (!addressPayload.region || addressPayload.region === "UNKNOWN") {
-        console.error("REGION IS MISSING or UNKNOWN after API call!");
-        currentError = "주소에서 지역 정보를 가져올 수 없습니다 (API 오류?).";
-        setError(currentError);
-        // setLoading(false);
-        return; // Prevent upsert if region is missing
-      }
-      if (!addressPayload.location_code || addressPayload.location_code === "UNKNOWN") {
-        console.error("LOCATION CODE IS MISSING or UNKNOWN after API call!");
-        currentError = "주소에서 위치 코드를 가져올 수 없습니다 (API 오류?).";
-        setError(currentError);
-        // setLoading(false);
-        return; // Prevent upsert if location_code is missing
+      if (addressError) {
+        console.error("주소 정보 업데이트 실패:", addressError);
+        throw new Error(`주소 정보 업데이트 실패: ${addressError.message}`);
       }
 
-      const { error: addressUpsertError } = await supabase
-        .from('user_address_info')
-        .upsert(addressPayload, { onConflict: 'user_id' });
+      // 2. 호텔 이름 업데이트 (users 테이블)
+      if (hotelName) {
+        console.log("호텔 이름 업데이트 시도:", {
+          hotel_name: hotelName
+        });
 
-      if (addressUpsertError) {
-        // Log the full error object for detailed inspection, force stringify
-        let errorString = "알 수 없는 주소 저장 오류";
-        try {
-          errorString = JSON.stringify(addressUpsertError);
-        } catch (e) {
-          console.error("Failed to stringify addressUpsertError:", e);
+        const { error: userError } = await supabase
+          .from("users")
+          .update({ hotel_name: hotelName })
+          .eq("id", userId);
+
+        if (userError) {
+          console.error("호텔 이름 업데이트 실패:", userError);
+          setError("호텔 이름 업데이트 실패: " + userError.message);
+          setTimeout(() => setError(""), 3000);
+          return;
         }
-        console.error("Supabase Address Upsert Error Object (Stringified):", errorString);
-
-        // Provide a more informative error message, falling back to stringified object
-        currentError = `주소 정보 저장 실패: ${addressUpsertError.message || errorString}`;
-        // Check for specific NOT NULL violation if possible (might be in message or code)
-        if (addressUpsertError.message?.includes('violates not-null constraint') && addressUpsertError.message?.includes('"region"')) {
-          currentError = '주소 정보 저장 실패: 지역(region) 정보가 누락되었습니다.';
-        }
-        setError(currentError);
-        throw addressUpsertError; // Stop further execution
-      }
-      console.log("Address info saved successfully!");
-
-
-      // --- Operation 2: Update User Info ---
-      const userPayload = {
-        // user_id is used in .eq(), not in the payload itself for update
-        hotel_name: hotelName,
-        competitor_hotels: selectedCompetitorHotels,
-        is_initialized: true, // Mark as initialized after saving settings
-      };
-
-      console.log("Attempting to update user payload:", userPayload);
-
-      const { error: userUpdateError } = await supabase
-        .from('users')
-        .update(userPayload)
-        .eq('id', userId); // Use user_id to specify which user to update
-
-      if (userUpdateError) {
-        // Log the full error object, force stringify
-        let errorString = "알 수 없는 사용자 정보 업데이트 오류";
-        try {
-          errorString = JSON.stringify(userUpdateError);
-        } catch (e) {
-          console.error("Failed to stringify userUpdateError:", e);
-        }
-        console.error("Supabase User Update Error Object (Stringified):", errorString);
-
-        // Provide a more informative error message
-        currentError = `사용자 정보 업데이트 실패: ${userUpdateError.message || errorString}`;
-        setError(currentError);
-        // Don't necessarily throw here if address was saved, depends on desired behavior
-      } else {
-        console.log("User info updated successfully!");
+        console.log("호텔 이름 업데이트 성공");
       }
 
-
-      // --- Post-Save Actions ---
-      // Only redirect if no error occurred during user update
-      if (!currentError && !userUpdateError) { // Check if currentError is still empty and userUpdate was successful
-        console.log("Onboarding complete. Redirecting to dashboard...");
-        router.push(dashboardPath);
+      // 3. 내 호텔을 경쟁 호텔 목록에 추가 (이미 있으면 추가하지 않음)
+      if (!selectedCompetitorHotels.includes(hotelName)) {
+        setSelectedCompetitorHotels(prev => [...prev, hotelName]);
       }
 
+      // 원본 데이터 업데이트
+      setOriginalHotelAddress(hotelAddress);
+      setOriginalHotelName(hotelName);
+
+      // 성공 메시지 표시
+      setError("내 호텔 정보가 성공적으로 저장되었습니다.");
+      setTimeout(() => setError(""), 3000);
 
     } catch (error: any) {
-      // Log the full caught error object, force stringify
-      let errorString = "알 수 없는 제출 오류";
-      try {
-        errorString = JSON.stringify(error);
-      } catch (e) {
-        console.error("Failed to stringify caught error:", e);
-      }
-      console.error("Form submission caught error object (Stringified):", errorString);
+      console.error("내 호텔 정보 저장 오류:", error);
+      setError(error.message || "처리 중 오류가 발생했습니다.");
+      setTimeout(() => setError(""), 3000);
+    }
+  };
 
-      // Set error state only if it wasn't set by specific checks above
-      if (!currentError) { // Check if an error message was already set
-        let displayError = "예상치 못한 오류가 발생했습니다.";
-        if (error) {
-          if (typeof error === 'object' && error !== null) {
-            displayError = error.message || errorString; // Use message if available, else stringified
-          } else if (typeof error === 'string') {
-            displayError = error;
-          }
-        }
-        setError(displayError);
+  // 경쟁 호텔 정보만 저장하는 함수 (기존 handleSubmit 함수 수정)
+  const saveCompetitorHotels = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (!userId) {
+      setError("사용자 정보를 확인할 수 없습니다.");
+      return;
+    }
+
+    if (selectedCompetitorHotels.length === 0) {
+      setError("선택된 경쟁 호텔이 없습니다.");
+      setTimeout(() => setError(""), 3000);
+      return;
+    }
+
+    try {
+      console.log("경쟁 호텔 정보 저장 시작:", {
+        userId,
+        selectedCompetitorHotels
+      });
+
+      // 1. 경쟁 호텔 업데이트 (users 테이블)
+      console.log("경쟁 호텔 업데이트 시도:", {
+        competitor_hotels: selectedCompetitorHotels
+      });
+
+      const { error: userError } = await supabase
+        .from("users")
+        .update({
+          competitor_hotels: selectedCompetitorHotels,
+          is_initialized: true
+        })
+        .eq("id", userId);
+
+      if (userError) {
+        console.error("경쟁 호텔 업데이트 실패:", userError);
+        setError("경쟁 호텔 업데이트 실패: " + userError.message);
+        setTimeout(() => setError(""), 3000);
+        return;
       }
-    } finally {
-      // setLoading(false);
+      console.log("경쟁 호텔 업데이트 성공");
+
+      // 2. FastAPI API 호출 (LocalDB 업데이트)
+      try {
+        console.log("경쟁 호텔 API 호출 시도:", {
+          user_id: userId,
+          hotels: selectedCompetitorHotels
+        });
+
+        const competitorResponse = await fetch(`${getApiBaseUrl()}/api/competitor-hotels/update`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ user_id: userId, hotels: selectedCompetitorHotels }),
+        });
+
+        if (competitorResponse.ok) {
+          const competitorData = await competitorResponse.json();
+          console.log("경쟁 호텔 API 응답:", competitorData);
+        } else {
+          const errorData = await competitorResponse.json();
+          console.error("경쟁 호텔 API 오류:", errorData);
+          setError(errorData.detail || "경쟁 호텔 업데이트 에러");
+          setTimeout(() => setError(""), 3000);
+          return;
+        }
+      } catch (apiError: any) {
+        console.error("경쟁 호텔 API 호출 실패:", apiError);
+        setError("경쟁 호텔 API 호출 실패: " + (apiError.message || "알 수 없는 오류"));
+        setTimeout(() => setError(""), 3000);
+        return;
+      }
+
+      // 원본 데이터 업데이트
+      setOriginalCompetitorHotels([...selectedCompetitorHotels]);
+
+      // 성공 메시지 표시
+      setError("경쟁 호텔 정보가 성공적으로 저장되었습니다.");
+      setTimeout(() => setError(""), 3000);
+
+      // 대시보드로 이동
+      router.push("/dashboard");
+
+    } catch (error: any) {
+      console.error("경쟁 호텔 정보 저장 오류:", error);
+      setError("처리 중 오류가 발생했습니다: " + (error.message || "알 수 없는 오류"));
+      setTimeout(() => setError(""), 3000);
     }
   };
 
@@ -444,12 +581,12 @@ const UserSettingsForm = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center'
-        }}>회원 초기화 정보 입력</h2>
+        }}>회원 정보 입력</h2>
 
         {error && (
           <Box sx={{
-            backgroundColor: 'rgba(231, 76, 60, 0.1)',
-            color: '#e74c3c',
+            backgroundColor: error.includes("성공") ? 'rgba(46, 204, 113, 0.1)' : 'rgba(231, 76, 60, 0.1)',
+            color: error.includes("성공") ? '#2ecc71' : '#e74c3c',
             p: 2,
             borderRadius: 2,
             mb: 3,
@@ -462,30 +599,31 @@ const UserSettingsForm = () => {
           </Box>
         )}
 
-        <form id="onboardingForm" onSubmit={handleSubmit} className="flex flex-col space-y-4">
+        {/* 내 호텔 정보 섹션 */}
+        <Box sx={{
+          borderRadius: '16px',
+          overflow: 'hidden',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
+          backgroundColor: 'white',
+          mb: 4
+        }}>
           <Box sx={{
-            borderRadius: '16px',
-            overflow: 'hidden',
-            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
-            backgroundColor: 'white',
-            mb: 4
+            p: 3,
+            borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            background: 'linear-gradient(90deg, #2c3e50 0%, #34495e 100%)',
+            color: 'white'
           }}>
-            <Box sx={{
-              p: 3,
-              borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              background: 'linear-gradient(90deg, #2c3e50 0%, #34495e 100%)',
-              color: 'white'
-            }}>
-              <h2 className="text-lg font-semibold" style={{ color: 'white' }}>
-                호텔 정보
-              </h2>
-            </Box>
+            <h2 className="text-lg font-semibold" style={{ color: 'white' }}>
+              내 호텔 정보
+            </h2>
+          </Box>
 
+          <form id="myHotelForm" onSubmit={saveMyHotelInfo}>
             <Box sx={{ p: 3 }}>
-              <Box className="flex items-center gap-2 mb-4">
+              <Box className="flex items-center gap-2 mb-3">
                 <TextField
                   label="호텔 주소"
                   value={hotelAddress}
@@ -513,66 +651,221 @@ const UserSettingsForm = () => {
                       backgroundColor: '#34495e',
                     },
                     borderRadius: '8px',
-                    height: '56px'
+                    textTransform: 'none',
                   }}
                 >
                   우편번호 검색
                 </Button>
               </Box>
 
-              <TextField
-                label="호텔 이름"
-                value={hotelName} // This value should now always be a string
-                onChange={(e) => setHotelName(e.target.value)}
-                fullWidth
-                required
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: '8px',
-                    '&:hover fieldset': {
-                      borderColor: '#2c3e50',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#2c3e50',
-                    },
+              <Autocomplete
+                freeSolo
+                disableClearable
+                options={searchResults}
+                getOptionLabel={(option) =>
+                  typeof option === "string" ? option : option.description
+                }
+                inputValue={hotelName}
+                onInputChange={(_, newValue) => setHotelName(newValue)}
+                onChange={(_, newValue) => {
+                  if (typeof newValue === "string") return;
+                  if (newValue && newValue.place_id) {
+                    // 호텔 상세 정보 가져오기
+                    if (placesServiceRef.current) {
+                      placesServiceRef.current.getDetails(
+                        {
+                          placeId: newValue.place_id,
+                          fields: ["name", "geometry", "formatted_address"],
+                        },
+                        (place, status) => {
+                          if (
+                            status === google.maps.places.PlacesServiceStatus.OK &&
+                            place &&
+                            place.name &&
+                            place.geometry?.location
+                          ) {
+                            // 호텔 이름 설정
+                            setHotelName(place.name);
+
+                            // 주소가 있으면 설정
+                            if (place.formatted_address) {
+                              setHotelAddress(place.formatted_address);
+                            }
+
+                            // 위도/경도 설정
+                            if (place.geometry?.location) {
+                              setHotelLatitude(place.geometry.location.lat());
+                              setHotelLongitude(place.geometry.location.lng());
+
+                              // 지도 이동
+                              if (map) {
+                                map.panTo(place.geometry.location);
+                                map.setZoom(18);
+
+                                // 마커 설정
+                                if (marker) {
+                                  marker.setMap(null);
+                                }
+                                const newMarker = new google.maps.Marker({
+                                  position: place.geometry.location,
+                                  map: map,
+                                });
+                                setMarker(newMarker);
+                              }
+                            }
+                          }
+                        }
+                      );
+                    }
                   }
                 }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="호텔 이름(검색을 통해 선택)"
+                    fullWidth
+                    required
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setHotelName(value);
+                      if (value.length > 2 && autocompleteRef.current && map) {
+                        const center = map.getCenter();
+                        if (center) {
+                          autocompleteRef.current.getPlacePredictions(
+                            {
+                              input: value,
+                              types: ["lodging"],
+                              location: new google.maps.LatLng(center.lat(), center.lng()),
+                              radius: 50000,
+                            },
+                            (predictions, status) => {
+                              if (
+                                status === google.maps.places.PlacesServiceStatus.OK &&
+                                predictions
+                              ) {
+                                setSearchResults(predictions);
+                              } else {
+                                setSearchResults([]);
+                              }
+                            }
+                          );
+                        }
+                      } else {
+                        setSearchResults([]);
+                      }
+                    }}
+                    InputProps={{
+                      ...params.InputProps,
+                      type: "search",
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '8px',
+                        '&:hover fieldset': {
+                          borderColor: '#2c3e50',
+                        },
+                        '&.Mui-focused fieldset': {
+                          borderColor: '#2c3e50',
+                        },
+                      }
+                    }}
+                  />
+                )}
+                renderOption={(props, option) => (
+                  <li {...props} key={option.place_id}>
+                    {option.description}
+                  </li>
+                )}
               />
-            </Box>
 
-            <Box sx={{
-              p: 2,
-              borderTop: '1px solid rgba(0, 0, 0, 0.05)',
-              backgroundColor: '#f8fafc',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <span style={{ color: '#64748b', fontSize: '0.8rem' }}>
-                호텔 주소와 이름을 입력하세요
-              </span>
+              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  sx={{
+                    backgroundColor: '#2c3e50',
+                    '&:hover': {
+                      backgroundColor: '#34495e',
+                    },
+                    borderRadius: '8px',
+                    padding: '8px 16px',
+                    textTransform: 'none',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  내 호텔 정보 저장
+                </Button>
+              </Box>
             </Box>
+          </form>
+        </Box>
+
+        {/* 경쟁 호텔 선택 섹션 */}
+        <Box sx={{
+          borderRadius: '16px',
+          overflow: 'hidden',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
+          backgroundColor: 'white',
+          position: 'relative'
+        }}>
+          <Box sx={{
+            p: 3,
+            borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            background: 'linear-gradient(90deg, #2c3e50 0%, #34495e 100%)',
+            color: 'white'
+          }}>
+            <h2 className="text-lg font-semibold" style={{ color: 'white' }}>
+              경쟁 호텔 선택 (최대 5개)
+            </h2>
           </Box>
 
-          <Box sx={{
-            borderRadius: '16px',
-            overflow: 'hidden',
-            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
-            backgroundColor: 'white',
-            position: 'relative'
-          }}>
-            <Box sx={{
-              p: 3,
-              borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              background: 'linear-gradient(90deg, #2c3e50 0%, #34495e 100%)',
-              color: 'white'
-            }}>
-              <h2 className="text-lg font-semibold" style={{ color: 'white' }}>
-                경쟁 호텔 선택 (최대 5개)
-              </h2>
+          <form id="competitorHotelsForm" onSubmit={saveCompetitorHotels}>
+            <Box sx={{ p: 3, borderBottom: '1px solid rgba(0, 0, 0, 0.05)' }}>
+              <Autocomplete
+                freeSolo
+                disableClearable
+                options={searchResults}
+                getOptionLabel={(option) =>
+                  typeof option === "string" ? option : option.description
+                }
+                inputValue={searchValue}
+                onInputChange={(_, newValue) => setSearchValue(newValue)}
+                onChange={(_, newValue) => {
+                  if (typeof newValue === "string") return;
+                  if (newValue) handleSearchResultSelect(newValue);
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="호텔 이름으로 검색"
+                    fullWidth
+                    onChange={handleSearchChange}
+                    InputProps={{
+                      ...params.InputProps,
+                      type: "search",
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '8px',
+                        '&:hover fieldset': {
+                          borderColor: '#2c3e50',
+                        },
+                        '&.Mui-focused fieldset': {
+                          borderColor: '#2c3e50',
+                        },
+                      }
+                    }}
+                  />
+                )}
+                renderOption={(props, option) => (
+                  <li {...props} key={option.place_id}>
+                    {option.description}
+                  </li>
+                )}
+              />
             </Box>
 
             <GoogleMap
@@ -588,7 +881,7 @@ const UserSettingsForm = () => {
             <Box
               sx={{
                 position: "absolute",
-                top: 70,
+                top: 130,
                 right: 10,
                 width: "300px",
                 maxHeight: "400px",
@@ -614,36 +907,55 @@ const UserSettingsForm = () => {
               }}
             >
               <Box sx={{ mb: 2, fontWeight: 'bold', color: '#2c3e50' }}>
-                선택된 경쟁 호텔
+                선택된 호텔
               </Box>
 
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
                 {selectedCompetitorHotels.length > 0 ? (
-                  selectedCompetitorHotels.map((hotel, index) => (
-                    <Chip
-                      key={index}
-                      label={hotel}
-                      onDelete={() =>
-                        setSelectedCompetitorHotels((prev) =>
-                          prev.filter((item) => item !== hotel)
-                        )
-                      }
-                      sx={{
-                        my: 0.5,
-                        backgroundColor: '#2c3e50',
-                        color: "white",
-                        '&:hover': {
-                          backgroundColor: '#34495e',
-                        },
-                        '& .MuiChip-deleteIcon': {
-                          color: 'white',
+                  // 내 호텔을 첫 번째로 정렬하고 나머지 호텔을 알파벳 순으로 정렬
+                  [...selectedCompetitorHotels]
+                    .sort((a, b) => {
+                      // 내 호텔이면 항상 첫 번째로
+                      if (a === hotelName) return -1;
+                      if (b === hotelName) return 1;
+                      // 그 외에는 알파벳 순으로 정렬
+                      return a.localeCompare(b);
+                    })
+                    .map((hotel, index) => (
+                      <Chip
+                        key={index}
+                        label={hotel}
+                        onDelete={() => handleRemoveHotel(hotel)}
+                        sx={{
+                          my: 0.5,
+                          backgroundColor: hotel === hotelName ? '#e74c3c' : '#2c3e50',
+                          color: "white",
+                          fontWeight: hotel === hotelName ? 'bold' : 'normal',
+                          border: hotel === hotelName ? '2px solid #f39c12' : 'none',
                           '&:hover': {
-                            color: '#e74c3c',
+                            backgroundColor: hotel === hotelName ? '#c0392b' : '#34495e',
                           },
-                        },
-                      }}
-                    />
-                  ))
+                          '& .MuiChip-deleteIcon': {
+                            color: 'white',
+                            '&:hover': {
+                              color: '#e74c3c',
+                            },
+                          },
+                          '&::after': hotel === hotelName ? {
+                            content: '"내 호텔"',
+                            position: 'absolute',
+                            top: '-8px',
+                            right: '8px',
+                            fontSize: '10px',
+                            backgroundColor: '#f39c12',
+                            color: 'white',
+                            padding: '1px 4px',
+                            borderRadius: '4px',
+                            fontWeight: 'bold',
+                          } : {},
+                        }}
+                      />
+                    ))
                 ) : (
                   <Typography sx={{ color: '#64748b' }}>선택된 호텔이 없습니다.</Typography>
                 )}
@@ -659,41 +971,36 @@ const UserSettingsForm = () => {
               alignItems: 'center'
             }}>
               <span style={{ color: '#64748b', fontSize: '0.8rem' }}>
-                지도에서 호텔을 클릭하여 경쟁 호텔을 선택하세요
+                지도에서 호텔을 클릭하거나 검색하여 경쟁 호텔을 선택하세요
               </span>
               <span style={{ color: '#64748b', fontSize: '0.8rem' }}>
                 선택된 호텔: {selectedCompetitorHotels.length}/5개
               </span>
             </Box>
-          </Box>
-        </form>
 
-        <Box sx={{ mt: 4 }}>
-          <Button
-            type="submit"
-            form="onboardingForm"
-            variant="contained"
-            color="primary"
-            fullWidth
-            sx={{
-              backgroundColor: '#2c3e50',
-              '&:hover': {
-                backgroundColor: '#34495e',
-              },
-              borderRadius: '8px',
-              padding: '12px',
-              fontSize: '1rem',
-              fontWeight: 'bold',
-              textTransform: 'none',
-              boxShadow: '0 4px 6px rgba(44, 62, 80, 0.2)',
-            }}
-          >
-            정보 업데이트
-          </Button>
+            <Box sx={{ p: 3, display: 'flex', justifyContent: 'flex-end' }}>
+              <Button
+                type="submit"
+                variant="contained"
+                color="primary"
+                sx={{
+                  backgroundColor: '#2c3e50',
+                  '&:hover': {
+                    backgroundColor: '#34495e',
+                  },
+                  borderRadius: '8px',
+                  padding: '8px 16px',
+                  fontSize: '1rem',
+                  fontWeight: 'bold',
+                  textTransform: 'none',
+                }}
+              >
+                경쟁 호텔 정보 저장
+              </Button>
+            </Box>
+          </form>
         </Box>
       </div>
     </div>
   );
-};
-
-export default UserSettingsForm;
+}

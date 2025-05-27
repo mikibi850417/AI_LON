@@ -34,14 +34,17 @@ const getWeatherIcon = (weatherCode: number | null) => {
 
     switch (weatherCode) {
         case 1:
-            return <WbSunnyIcon sx={{ color: '#FF9800' }} />;
-        case 3:
-            return <UmbrellaIcon sx={{ color: '#2196F3' }} />;
-        case 4:
-            return <AcUnitIcon sx={{ color: '#90CAF9' }} />;
+            return <WbSunnyIcon sx={{ color: "gold" }} />; // 맑음
         case 2:
+            return <CloudIcon sx={{ color: "#78909c" }} />; // 구름많음 - 밝은 회색
+        case 3:
+            return <CloudIcon sx={{ color: "#455a64" }} />; // 흐림 - 어두운 회색
+        case 4:
+            return <UmbrellaIcon sx={{ color: "skyblue" }} />; // 비
+        case 5:
+            return <AcUnitIcon sx={{ color: "lightblue" }} />; // 눈
         default:
-            return <CloudIcon sx={{ color: '#78909C' }} />;
+            return <CloudIcon sx={{ color: "#78909c" }} />;
     }
 };
 
@@ -81,36 +84,43 @@ interface PerformanceData {
     cast?: string;
 }
 
-export default function EventWeatherTable({ locationCode }: { locationCode: string }) {
+export default function EventWeatherTable({ locationCode, days = 7, dates }: { locationCode: string, days?: number, dates?: string[] }) {
     const [weatherData, setWeatherData] = useState<Record<string, WeatherData>>({});
     const [holidayData, setHolidayData] = useState<Record<string, HolidayData[]>>({});
     const [performanceData, setPerformanceData] = useState<Record<string, PerformanceData[]>>({});
-    const [dates, setDates] = useState<string[]>([]);
+    const [localDates, setLocalDates] = useState<string[]>([]);
     const [lastUpdated, setLastUpdated] = useState<string>("");
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (!locationCode) {
-            console.warn("locationCode가 유효하지 않습니다. API 호출을 건너뜁니다.");
-            return; // locationCode가 없으면 API 호출을 건너뜀
+        // 부모 컴포넌트에서 dates를 받아오면 사용하고, 아니면 자체적으로 생성
+        if (dates && dates.length > 0) {
+            setLocalDates(dates);
+        } else {
+            const today = new Date();
+            const newDates = Array.from({ length: days }, (_, i) => format(addDays(today, i), "yyyy-MM-dd"));
+            setLocalDates(newDates);
         }
+    }, [days, dates]);
 
+    useEffect(() => {
+        if (!locationCode || localDates.length === 0) return;
+        
         // 클라이언트 사이드에서만 현재 시간 설정
         setLastUpdated(new Date().toLocaleString('ko-KR'));
 
+        // 날짜 범위 계산 - 수정된 부분
         const today = new Date();
         const start = format(today, "yyyy-MM-dd");
-        const end = format(addDays(today, 6), "yyyy-MM-dd");
-        const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(today, i), "yyyy-MM-dd"));
-        setDates(weekDates);
+        const end = format(addDays(today, days - 1), "yyyy-MM-dd"); // days 값에 따라 종료일 계산
 
-        // 날씨 데이터 가져오기 (서울특별시 기준)
+        // 날씨 데이터 가져오기
         const fetchWeather = async () => {
             try {
                 // location_code 값을 사용하여 날씨 데이터 가져오기
                 const url = `${getApiBaseUrl()}/api/weather/?start_date=${start}&end_date=${end}&region=${locationCode}`;
-                // console.log(`날씨 API 호출: ${url}`);
+                console.log(`날씨 API 호출: ${url}`); // 디버깅용 로그 추가
 
                 const res = await fetch(url);
                 if (!res.ok) {
@@ -118,7 +128,7 @@ export default function EventWeatherTable({ locationCode }: { locationCode: stri
                 }
 
                 const result = await res.json();
-                // console.log("날씨 데이터 응답:", result);
+                console.log("날씨 데이터 응답:", result); // 디버깅용 로그 추가
 
                 const weatherMap: Record<string, WeatherData> = {};
 
@@ -165,7 +175,7 @@ export default function EventWeatherTable({ locationCode }: { locationCode: stri
         const fetchHolidays = async () => {
             try {
                 const url = `${getApiBaseUrl()}/api/holidays/?start_date=${start}&end_date=${end}`;
-                // console.log(`공휴일 API 호출: ${url}`);
+                console.log(`공휴일 API 호출: ${url}`); // 디버깅용 로그 추가
 
                 const res = await fetch(url);
                 const rawText = await res.text();
@@ -275,48 +285,66 @@ export default function EventWeatherTable({ locationCode }: { locationCode: stri
             }
         };
 
-        // 공연 데이터 가져오기 (서울특별시 기준, 대중음악 장르만)
+        // 공연 데이터 가져오기
         const fetchPerformances = async () => {
             try {
+                // API URL 구성 - 대중음악 장르 필터 추가
                 const url = `${getApiBaseUrl()}/api/prf/performances?start_date=${start}&end_date=${end}&genre=대중음악`;
-                // console.log(`공연 API 호출: ${url}`);
+                console.log(`공연 API 호출: ${url}`);
 
+                // API 호출
                 const res = await fetch(url);
+                
                 if (!res.ok) {
-                    throw new Error(`API 응답 오류: ${res.status}`);
+                    console.error(`공연 API 오류: ${res.status}`);
+                    setPerformanceData({});
+                    return;
                 }
-
+                
                 const result = await res.json();
-                // console.log("공연 데이터 응답:", result);
+                console.log("공연 데이터 응답:", result);
 
+                // 데이터 가공
                 const performanceMap: Record<string, PerformanceData[]> = {};
 
-                if (Array.isArray(result)) {
+                // 응답 구조에 따라 데이터 처리 방식 수정
+                if (result?.items && Array.isArray(result.items)) {
+                    // items 배열이 있는 경우
+                    result.items.forEach((item: any) => {
+                        processPerformanceItem(item, performanceMap);
+                    });
+                } else if (Array.isArray(result)) {
+                    // 응답이 바로 배열인 경우
                     result.forEach((item: any) => {
-                        // p_date 또는 date 필드 확인
-                        const date = item.p_date?.slice(0, 10) || item.date?.slice(0, 10);
-                        if (date) {
-                            if (!performanceMap[date]) {
-                                performanceMap[date] = [];
-                            }
-                            performanceMap[date].push({
-                                pid: item.pid || "",
-                                name: item.name || "제목 없음",
-                                p_date: date,
-                                venue: item.venue || "장소 미정",
-                                cast: item.cast || ""
-                            });
-                        }
+                        processPerformanceItem(item, performanceMap);
                     });
                 }
 
-                // console.log("가공된 공연 데이터:", performanceMap);
+                console.log("가공된 공연 데이터:", performanceMap);
                 setPerformanceData(performanceMap);
-            } catch (e) {
-                console.error("공연 데이터 로드 실패", e);
-                setError("공연 데이터를 불러오는 중 오류가 발생했습니다.");
-            } finally {
-                setLoading(false);
+            } catch (err) {
+                console.error("공연 데이터 로드 실패", err);
+                setPerformanceData({});
+            }
+        };
+
+        // 공연 데이터 항목 처리 헬퍼 함수
+        const processPerformanceItem = (item: any, performanceMap: Record<string, PerformanceData[]>) => {
+            // p_date 필드에서 날짜 추출 (event_calendar/page.tsx와 일치시킴)
+            const date = item.p_date?.slice(0, 10);
+            
+            if (date) {
+                if (!performanceMap[date]) {
+                    performanceMap[date] = [];
+                }
+                
+                performanceMap[date].push({
+                    pid: item.pid || "",
+                    name: item.name || "공연 정보 없음",
+                    p_date: date,
+                    venue: item.venue || "",
+                    cast: item.cast || ""
+                });
             }
         };
 
@@ -335,7 +363,7 @@ export default function EventWeatherTable({ locationCode }: { locationCode: stri
         };
 
         fetchAllData();
-    }, [locationCode]); // locationCode가 변경될 때만 useEffect 실행
+    }, [locationCode, localDates, days]); // days 의존성 추가
 
     // 로딩 상태 표시
     if (loading) {
@@ -431,7 +459,7 @@ export default function EventWeatherTable({ locationCode }: { locationCode: stri
                                 borderBottom: '2px solid #2c3e50',
                                 padding: '16px 24px',
                             }}>항목</TableCell>
-                            {dates.map((date) => {
+                            {localDates.map((date) => {
                                 const day = new Date(date);
                                 const isWeekend = day.getDay() === 0 || day.getDay() === 6;
                                 // 공휴일 데이터가 있고 배열 길이가 0보다 크면 공휴일로 간주
@@ -484,7 +512,7 @@ export default function EventWeatherTable({ locationCode }: { locationCode: stri
                                     날씨
                                 </Box>
                             </TableCell>
-                            {dates.map((date) => {
+                            {localDates.map((date) => {
                                 const weather = weatherData[date];
                                 return (
                                     <TableCell key={date} sx={{
@@ -498,9 +526,10 @@ export default function EventWeatherTable({ locationCode }: { locationCode: stri
                                                     {getWeatherIcon(weather.weather_code)}
                                                     <Typography variant="body2" sx={{ ml: 0.5 }}>
                                                         {weather.weather_code === 1 ? '맑음' :
-                                                            weather.weather_code === 2 ? '흐림' :
-                                                                weather.weather_code === 3 ? '비' :
-                                                                    weather.weather_code === 4 ? '눈' : '정보 없음'}
+                                                            weather.weather_code === 2 ? '구름많음' :
+                                                                weather.weather_code === 3 ? '흐림' :
+                                                                    weather.weather_code === 4 ? '비' :
+                                                                        weather.weather_code === 5 ? '눈' : '정보 없음'}
                                                     </Typography>
                                                 </Box>
                                                 <Typography variant="body2">
@@ -536,7 +565,7 @@ export default function EventWeatherTable({ locationCode }: { locationCode: stri
                                     공휴일
                                 </Box>
                             </TableCell>
-                            {dates.map((date) => {
+                            {localDates.map((date) => {
                                 const holidays = holidayData[date] || [];
                                 return (
                                     <TableCell key={date} sx={{
@@ -589,7 +618,7 @@ export default function EventWeatherTable({ locationCode }: { locationCode: stri
                                     공연/이벤트
                                 </Box>
                             </TableCell>
-                            {dates.map((date) => {
+                            {localDates.map((date) => {
                                 const performances = performanceData[date] || [];
                                 return (
                                     <TableCell key={date} sx={{

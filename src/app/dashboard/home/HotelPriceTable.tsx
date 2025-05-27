@@ -96,19 +96,23 @@ export default function HotelPriceTable({ data, dates }: Props) {
                 borderBottom: '2px solid #2c3e50',
                 padding: '16px 24px',
               }}>호텔명</TableCell>
-              {dates.map((date) => (
-                <TableCell key={date} sx={{
-                  ...contentCellStyle,
-                  fontSize: '0.9rem',
-                  color: '#2c3e50',
-                  fontWeight: 600,
-                  borderBottom: '2px solid #2c3e50',
-                  padding: '16px 24px',
-                  textAlign: 'center',
-                }}>
-                  {date.slice(5)}
-                </TableCell>
-              ))}
+              {dates.map((date) => {
+                // 요일 계산
+                const dayOfWeek = new Date(date).toLocaleDateString('ko-KR', { weekday: 'short' });
+                return (
+                  <TableCell key={date} sx={{
+                    ...contentCellStyle,
+                    fontSize: '0.9rem',
+                    color: '#2c3e50',
+                    fontWeight: 600,
+                    borderBottom: '2px solid #2c3e50',
+                    padding: '16px 24px',
+                    textAlign: 'center',
+                  }}>
+                    {date.slice(5)} ({dayOfWeek})
+                  </TableCell>
+                );
+              })}
             </TableRow>
           </TableHead>
           <TableBody>

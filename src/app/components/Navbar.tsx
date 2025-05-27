@@ -24,6 +24,7 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import SettingsIcon from '@mui/icons-material/Settings';
 import PaymentIcon from '@mui/icons-material/Payment';
 import LogoutIcon from '@mui/icons-material/Logout';
+import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
 
 const drawerWidth = 240;
 
@@ -38,6 +39,7 @@ const navItems = [
   { href: `${dashboardBase}/flight_price`, label: 'Flight Prices', icon: <FlightIcon /> },
   { href: `${dashboardBase}/weather_status`, label: 'Weather Status', icon: <WbSunnyIcon /> },
   { href: `${dashboardBase}/trend_of_famous_hotels`, label: 'Hotel Trends', icon: <TrendingUpIcon /> },
+  { href: `${dashboardBase}/guide_videos`, label: 'Guide Videos', icon: <VideoLibraryIcon /> },
   { href: `${dashboardBase}/settings`, label: 'Settings', icon: <SettingsIcon /> },
   { href: `${dashboardBase}/payment`, label: 'Payment', icon: <PaymentIcon /> },
   { href: `${dashboardBase}/logout`, label: 'Logout', icon: <LogoutIcon /> },
@@ -75,13 +77,15 @@ const Navbar: React.FC = () => {
           justifyContent: 'center',
           padding: '16px 0'
         }}>
-          <Image
-            src="/intelligentlon.png"
-            alt="Company Logo"
-            width={180}
-            height={60}
-            style={{ objectFit: 'contain' }}
-          />
+          <Link href="http://www.intelligentlon.com/" target="_blank" rel="noopener noreferrer">
+            <Image
+              src="/intelligentlon.png"
+              alt="Company Logo"
+              width={180}
+              height={60}
+              style={{ objectFit: 'contain' }}
+            />
+          </Link>
         </Box>
         {navItems.map((item) => (
           <ListItem key={item.href} disablePadding>

@@ -214,7 +214,12 @@ export default function HotelPriceChart({ data, dates }: Props) {
                             dataKey="date" 
                             tick={{ fill: '#64748b' }}
                             axisLine={{ stroke: '#cbd5e1' }}
-                            tickFormatter={(value) => value.replace(/^2025-/, '')}
+                            tickFormatter={(value) => {
+                                const date = new Date(value);
+                                const days = ['일', '월', '화', '수', '목', '금', '토'];
+                                const dayOfWeek = days[date.getDay()];
+                                return `${value.replace(/^2025-/, '')} (${dayOfWeek})`;
+                            }}
                         />
                         <YAxis 
                             tick={{ fill: '#64748b' }}

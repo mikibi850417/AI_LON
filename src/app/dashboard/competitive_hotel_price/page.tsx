@@ -1,14 +1,15 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Box, CircularProgress, Typography } from "@mui/material";
-import PriceChangeIcon from "@mui/icons-material/PriceChange";
+import { Box, CircularProgress, Typography, Fab, Tooltip, Dialog, IconButton, Avatar } from "@mui/material";
+import CloseIcon from '@mui/icons-material/Close';
+import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 import HotelSearchAndMap from "./HotelSearchAndMap";
 import HotelDataVisualization from "./HotelDataVisualization";
-// HotelPredictPrice를 직접 import 대신 공통 컴포넌트 사용
 import HotelPredictPrice from "@/lib/components/HotelPredictPrice";
 import { fetchHotelData, buildPivotTableFromEntries, computeLineChartDataAllRows } from "./utils";
+import PriceChangeIcon from '@mui/icons-material/PriceChange';
 
 // Chart.js registration
 import {
@@ -64,6 +65,7 @@ export default function CompetitiveHotelPrice() {
   const [mapCenter, setMapCenter] = useState({ lat: 37.5665, lng: 126.9780 });
   const [loadingFavorites, setLoadingFavorites] = useState(true);
   const [userRegion, setUserRegion] = useState<{ location_code: string; region: string } | null>(null);
+  const [openPredictDialog, setOpenPredictDialog] = useState(false);
 
   // Fetch user data from Supabase
   useEffect(() => {
@@ -90,11 +92,18 @@ export default function CompetitiveHotelPrice() {
         if (addrError) {
           console.error("Address info fetch error:", addrError);
         } else if (addrInfo) {
-          // 지도 중심점 설정
-          setMapCenter({
-            lat: parseFloat(addrInfo.latitude),
-            lng: parseFloat(addrInfo.longitude),
-          });
+          // 지도 중심점 설정 - 유효한 숫자인지 확인 후 설정
+          const lat = parseFloat(addrInfo.latitude);
+          const lng = parseFloat(addrInfo.longitude);
+          
+          if (!isNaN(lat) && !isNaN(lng)) {
+            setMapCenter({
+              lat: lat,
+              lng: lng,
+            });
+          } else {
+            console.warn("좌표 변환 오류: 유효하지 않은 위도/경도 값입니다.", addrInfo.latitude, addrInfo.longitude);
+          }
 
           // 지역 정보 설정 (location_code와 region도 함께 가져오기)
           if (addrInfo.location_code && addrInfo.region) {
@@ -296,6 +305,16 @@ export default function CompetitiveHotelPrice() {
       .sort((a, b) => a - b);
   };
 
+  // 예측 다이얼로그 열기
+  const handleOpenPredictDialog = () => {
+    setOpenPredictDialog(true);
+  };
+
+  // 예측 다이얼로그 닫기
+  const handleClosePredictDialog = () => {
+    setOpenPredictDialog(false);
+  };
+
   return (
     <Box sx={{
       padding: { xs: '16px', md: '24px' },
@@ -304,20 +323,20 @@ export default function CompetitiveHotelPrice() {
       display: 'flex',
       flexDirection: 'column',
       gap: '24px',
-      minHeight: 'calc(100vh - 100px)'
+      minHeight: 'calc(100vh - 100px)',
+      position: 'relative'  // Floating Button을 위한 position 설정
     }}>
       {/* Header section */}
-      <Typography variant="h4" sx={{
-        mb: 4,
-        display: "flex",
-        alignItems: "center",
+      <h1 className="text-2xl font-bold mb-4" style={{ 
         color: '#2c3e50',
         padding: '16px 0',
-        borderBottom: '2px solid #e2e8f0'
+        borderBottom: '2px solid #e2e8f0',
+        display: 'flex',
+        alignItems: 'center'
       }}>
-        <PriceChangeIcon sx={{ mr: 1, color: '#2c3e50' }} />
-        호텔 가격
-      </Typography>
+        <PriceChangeIcon style={{ marginRight: '8px', color: '#2c3e50' }} /> 
+        Hotel Prices
+      </h1>
 
       {/* Main content */}
       <Box sx={{
@@ -422,16 +441,142 @@ export default function CompetitiveHotelPrice() {
             favoriteHotels={favoriteHotels}
           />
         )}
+      </Box>
 
-        {/* 공통 HotelPredictPrice 컴포넌트 사용 */}
-        {pivotTableRows.length > 0 && pivotTableDates.length > 0 && (
+      {/* Floating Action Button - 가격 조회 결과가 있을 때만 표시 */}
+      {pivotTableRows.length > 0 && pivotTableDates.length > 0 && (
+        <Tooltip 
+          title="AI 가격 예측" 
+          placement="left"
+          componentsProps={{
+            tooltip: {
+              sx: {
+                fontSize: '1.2rem',  
+                padding: '8px 12px',  
+                backgroundColor: 'rgba(44, 62, 80, 0.9)',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+                transform: 'translateY(-5px)',
+                transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+              }
+            }
+          }}
+        >
+          <Fab 
+            color="primary" 
+            aria-label="add"
+            sx={{
+              position: 'fixed',
+              bottom: 32,
+              right: 32,
+              backgroundColor: '#2c3e50',
+              backgroundImage: 'linear-gradient(135deg, #2c3e50 0%, #1a2530 100%)',
+              '&:hover': {
+                backgroundImage: 'linear-gradient(135deg, #34495e 0%, #2c3e50 100%)',
+                transform: 'scale(1.05) rotate(5deg)',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.3), 0 6px 12px rgba(44, 62, 80, 0.4)'
+              },
+              width: 128,
+              height: 128,
+              boxShadow: '0 6px 20px rgba(0,0,0,0.2), 0 3px 8px rgba(44, 62, 80, 0.3)',
+              transition: 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+              animation: 'pulse 2s infinite',
+              '@keyframes pulse': {
+                '0%': { boxShadow: '0 0 0 0 rgba(44, 62, 80, 0.7)' },
+                '70%': { boxShadow: '0 0 0 15px rgba(44, 62, 80, 0)' },
+                '100%': { boxShadow: '0 0 0 0 rgba(44, 62, 80, 0)' }
+              }
+            }}
+            onClick={handleOpenPredictDialog}
+          >
+            <Avatar 
+              sx={{ 
+                width: 120,
+                height: 120,
+                backgroundColor: 'transparent',
+                animation: 'float 3s ease-in-out infinite',
+                '@keyframes float': {
+                  '0%': { transform: 'translateY(0px)' },
+                  '50%': { transform: 'translateY(-10px)' },
+                  '100%': { transform: 'translateY(0px)' }
+                }
+              }}
+            >
+              <Image 
+                src="/webicon.png" 
+                alt="예측 아이콘" 
+                width={120}
+                height={120}
+                style={{ 
+                  objectFit: 'contain',
+                  filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))',
+                  transition: 'all 0.3s ease'
+                }}
+              />
+            </Avatar>
+          </Fab>
+        </Tooltip>
+      )}
+
+      {/* 예측된 호텔 가격 다이얼로그 */}
+      <Dialog 
+        open={openPredictDialog} 
+        onClose={handleClosePredictDialog}
+        maxWidth="md"
+        fullWidth
+        scroll="paper"
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            padding: { xs: '16px', sm: '24px' },
+            position: 'relative',
+            backgroundColor: '#f8fafc',
+            backgroundImage: 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(248,250,252,0.9) 100%)',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.15), 0 15px 25px rgba(49, 130, 206, 0.1)',
+            border: '1px solid rgba(226, 232, 240, 0.8)',
+            overflow: 'hidden',
+            maxHeight: { xs: 'calc(100% - 32px)', sm: 'calc(100% - 64px)' },
+            margin: { xs: '16px', sm: '32px' },
+            width: { xs: 'calc(100% - 32px)', sm: 'auto' }
+          }
+        }}
+      >
+        <IconButton
+          onClick={handleClosePredictDialog}
+          sx={{
+            position: 'absolute',
+            right: { xs: 8, sm: 16 },
+            top: { xs: 8, sm: 16 },
+            color: '#64748b',
+            backgroundColor: 'rgba(226, 232, 240, 0.5)',
+            '&:hover': {
+              backgroundColor: 'rgba(226, 232, 240, 0.8)',
+              color: '#2c3e50'
+            },
+            zIndex: 10
+          }}
+        >
+          <CloseIcon />
+        </IconButton>
+        
+        <Box sx={{ 
+          mt: { xs: 1, sm: 2 }, 
+          mb: { xs: 2, sm: 4 },
+          overflowY: 'auto',
+          maxHeight: { xs: 'calc(100vh - 120px)', sm: 'calc(100vh - 180px)' },
+          '&::-webkit-scrollbar': {
+            display: 'none'  // 웹킷 기반 브라우저에서 스크롤바 숨김
+          },
+          scrollbarWidth: 'none',  // Firefox에서 스크롤바 숨김
+          msOverflowStyle: 'none',  // IE에서 스크롤바 숨김
+        }}>
           <HotelPredictPrice
             dates={pivotTableDates}
             userRegion={userRegion}
             getPricesForDate={getPricesFromPivotTable}
+            title="L.O.N Price Insight"
           />
-        )}
-      </Box>
+        </Box>
+      </Dialog>
     </Box>
   );
 }

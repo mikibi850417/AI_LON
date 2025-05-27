@@ -13,7 +13,7 @@ export default function Footer() {
           </div>
           <div className={styles.section}>
             <h4>고객센터</h4>
-            <p>전화: 02‑XXXX‑XXXX</p>
+            <p>전화: 010-9974-8466</p>
             <p>이메일: lon@intelligentlon.com</p>
             <p>평일 09:00 - 18:00</p>
           </div>

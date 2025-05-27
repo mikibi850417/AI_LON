@@ -10,8 +10,10 @@ import TrendsTable from "./TrendsTable";
 import EventWeatherTable from "@/app/dashboard/home/EventWeatherTable";
 import SeasonalityTable from "@/app/dashboard/home/seasonalityTable";
 import { supabase } from "@/lib/supabaseClient";
-import { Box, CircularProgress } from "@mui/material";
+import { Box, CircularProgress, Fab, Tooltip, Dialog, IconButton, Avatar } from "@mui/material";
 import { format, addDays } from "date-fns";
+import CloseIcon from '@mui/icons-material/Close';
+import Image from "next/image";
 
 const getApiBaseUrl = (): string => process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -22,6 +24,7 @@ export default function DashboardPage() {
   const [days, setDays] = useState(7);
   const [dates, setDates] = useState<string[]>([]);
   const [userRegion, setUserRegion] = useState<{ location_code: string; region: string } | null>(null);
+  const [openPredictDialog, setOpenPredictDialog] = useState(false);
 
   useEffect(() => {
     const fetchSession = async () => {
@@ -94,8 +97,18 @@ export default function DashboardPage() {
       .sort((a, b) => a - b);
   };
 
+  // 예측 다이얼로그 열기
+  const handleOpenPredictDialog = () => {
+    setOpenPredictDialog(true);
+  };
+
+  // 예측 다이얼로그 닫기
+  const handleClosePredictDialog = () => {
+    setOpenPredictDialog(false);
+  };
+
   return (
-    <Box p={4} sx={{ background: '#f5f7fa', minHeight: '100vh' }}>
+    <Box p={4} sx={{ background: '#f5f7ff', minHeight: '100vh', position: 'relative' }}>
       <Box
         mb={4}
         sx={{
@@ -153,21 +166,146 @@ export default function DashboardPage() {
           <HotelPriceTable data={data} dates={dates} />
           <HotelPriceChart data={data} dates={dates} />
 
-          {/* 공통 HotelPredictPrice 컴포넌트 사용 */}
+          <TrendsTable days={days} dates={dates} />
+          <Box mt={3}>
+            <SeasonalityTable userRegion={userRegion} days={days} />
+          </Box>
+          <EventWeatherTable locationCode={userRegion?.location_code} days={days} dates={dates} />
+        </>
+      )}
+
+      {/* Floating Action Button */}
+      <Tooltip
+        title="AI 가격 예측"
+        placement="left"
+        componentsProps={{
+          tooltip: {
+            sx: {
+              fontSize: '1.2rem',
+              padding: '8px 12px',
+              backgroundColor: 'rgba(44, 62, 80, 0.9)',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+              transform: 'translateY(-5px)',
+              transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+            }
+          }
+        }}
+      >
+        <Fab
+          color="primary"
+          aria-label="add"
+          sx={{
+            position: 'fixed',
+            bottom: 32,
+            right: 32,
+            backgroundColor: '#2c3e50',
+            backgroundImage: 'linear-gradient(135deg, #2c3e50 0%, #1a2530 100%)',
+            '&:hover': {
+              backgroundImage: 'linear-gradient(135deg, #34495e 0%, #2c3e50 100%)',
+              transform: 'scale(1.05) rotate(5deg)',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.3), 0 6px 12px rgba(44, 62, 80, 0.4)'
+            },
+            width: 128,
+            height: 128,
+            boxShadow: '0 6px 20px rgba(0,0,0,0.2), 0 3px 8px rgba(44, 62, 80, 0.3)',
+            transition: 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            animation: 'pulse 2s infinite',
+            '@keyframes pulse': {
+              '0%': { boxShadow: '0 0 0 0 rgba(44, 62, 80, 0.7)' },
+              '70%': { boxShadow: '0 0 0 15px rgba(44, 62, 80, 0)' },
+              '100%': { boxShadow: '0 0 0 0 rgba(44, 62, 80, 0)' }
+            }
+          }}
+          onClick={handleOpenPredictDialog}
+        >
+          <Avatar
+            sx={{
+              width: 120,
+              height: 120,
+              backgroundColor: 'transparent',
+              animation: 'float 3s ease-in-out infinite',
+              '@keyframes float': {
+                '0%': { transform: 'translateY(0px)' },
+                '50%': { transform: 'translateY(-10px)' },
+                '100%': { transform: 'translateY(0px)' }
+              }
+            }}
+          >
+            <Image
+              src="/webicon.png"
+              alt="예측 아이콘"
+              width={120}
+              height={120}
+              style={{
+                objectFit: 'contain',
+                filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))',
+                transition: 'all 0.3s ease'
+              }}
+            />
+          </Avatar>
+        </Fab>
+      </Tooltip>
+
+      {/* 예측된 호텔 가격 다이얼로그 */}
+      <Dialog
+        open={openPredictDialog}
+        onClose={handleClosePredictDialog}
+        maxWidth="md"
+        fullWidth
+        scroll="paper"
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            padding: { xs: '16px', sm: '24px' },
+            position: 'relative',
+            backgroundColor: '#f8fafc',
+            backgroundImage: 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(248,250,252,0.9) 100%)',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.15), 0 15px 25px rgba(49, 130, 206, 0.1)',
+            border: '1px solid rgba(226, 232, 240, 0.8)',
+            overflow: 'hidden',
+            maxHeight: { xs: 'calc(100% - 32px)', sm: 'calc(100% - 64px)' },
+            margin: { xs: '16px', sm: '32px' },
+            width: { xs: 'calc(100% - 32px)', sm: 'auto' }
+          }
+        }}
+      >
+        <IconButton
+          onClick={handleClosePredictDialog}
+          sx={{
+            position: 'absolute',
+            right: { xs: 8, sm: 16 },
+            top: { xs: 8, sm: 16 },
+            color: '#64748b',
+            backgroundColor: 'rgba(226, 232, 240, 0.5)',
+            '&:hover': {
+              backgroundColor: 'rgba(226, 232, 240, 0.8)',
+              color: '#2c3e50'
+            },
+            zIndex: 10
+          }}
+        >
+          <CloseIcon />
+        </IconButton>
+
+        <Box sx={{
+          mt: { xs: 1, sm: 2 },
+          mb: { xs: 2, sm: 4 },
+          overflowY: 'auto',
+          maxHeight: { xs: 'calc(100vh - 120px)', sm: 'calc(100vh - 180px)' },
+          '&::-webkit-scrollbar': {
+            display: 'none'  // 웹킷 기반 브라우저에서 스크롤바 숨김
+          },
+          scrollbarWidth: 'none',  // Firefox에서 스크롤바 숨김
+          msOverflowStyle: 'none',  // IE에서 스크롤바 숨김
+        }}>
           <HotelPredictPrice
             dates={dates}
             userRegion={userRegion}
             getPricesForDate={getPricesForDate}
-            title="예측된 호텔 가격"
+            title="L.O.N Price Insight"
           />
-
-          <TrendsTable days={days} />
-          <Box mt={3}>
-            <SeasonalityTable userRegion={userRegion} />
-          </Box>
-          <EventWeatherTable locationCode={userRegion?.location_code} />
-        </>
-      )}
+        </Box>
+      </Dialog>
     </Box>
   );
 }
