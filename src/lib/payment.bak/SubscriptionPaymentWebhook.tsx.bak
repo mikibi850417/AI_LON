@@ -1,0 +1,264 @@
+'use client';
+
+import { useState } from 'react';
+import PortOne from '@portone/browser-sdk/v2';
+import {
+    Box,
+    Paper,
+    Typography,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel,
+    Button,
+    Alert,
+    CircularProgress,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogContentText,
+    DialogActions,
+} from '@mui/material';
+
+interface PaymentStatus {
+    status: 'IDLE' | 'PENDING' | 'PAID' | 'FAILED';
+    message?: string;
+}
+
+interface SubscriptionPaymentWebhookProps {
+    onSuccess?: (orderId: string) => void;
+    onError?: (error: string) => void;
+    pricePerMonth?: number;
+    customerId?: string;
+    customerEmail?: string;
+    paperStyles?: React.CSSProperties;
+    buttonColor?: string;
+    buttonHoverColor?: string;
+}
+
+export default function SubscriptionPaymentWebhook({
+    onSuccess,
+    onError,
+    pricePerMonth = 9900,
+    customerId,
+    customerEmail,
+    paperStyles = {},
+    buttonColor = '#2563eb',
+    buttonHoverColor = '#1d4ed8'
+}: SubscriptionPaymentWebhookProps) {
+    const [months, setMonths] = useState<number>(1);
+    const [error, setError] = useState<string | null>(null);
+    const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>({
+        status: 'IDLE',
+    });
+
+    // 랜덤 ID 생성 함수 (quickguide 패턴)
+    function randomId() {
+        return [...crypto.getRandomValues(new Uint32Array(2))]
+            .map((word) => word.toString(16).padStart(8, "0"))
+            .join("");
+    }
+
+    const handlePayment = async () => {
+        if (!customerId) {
+            const errorMessage = '로그인이 필요합니다.';
+            setError(errorMessage);
+            onError?.(errorMessage);
+            return;
+        }
+
+        setPaymentStatus({ status: 'PENDING' });
+        setError(null);
+
+        try {
+            // Step 1: Generate a unique payment ID (quickguide pattern)
+            const paymentId = randomId();
+
+            // Step 2: Calculate the total amount
+            const amount = months * pricePerMonth;
+
+            // Step 3: Request Payment using PortOne V2 API (quickguide pattern)
+            const payment = await PortOne.requestPayment({
+                storeId: process.env.NEXT_PUBLIC_PORTONE_STORE_ID!,
+                channelKey: process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY!,
+                paymentId: paymentId,
+                orderName: `${months}개월 구독`,
+                totalAmount: amount,
+                currency: "KRW" as const,
+                payMethod: "CARD",
+                customData: JSON.stringify({
+                    user_id: customerId,
+                    months: months,
+                }),
+                customerEmail: customerEmail,
+                customerName: '구독자',
+            });
+
+            // Step 4: Handle payment response (quickguide pattern)
+            if (payment.code !== undefined) {
+                // Payment failed or was cancelled
+                setPaymentStatus({
+                    status: 'FAILED',
+                    message: payment.message || '결제에 실패했습니다.',
+                });
+                onError?.(payment.message || '결제에 실패했습니다.');
+                return;
+            }
+
+            // Step 5: Verify payment with backend (quickguide pattern)
+            const completeResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/billing/payment/complete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    paymentId: payment.paymentId,
+                })
+            });
+
+            if (completeResponse.ok) {
+                const paymentComplete = await completeResponse.json();
+
+                // Check if payment was successful based on our backend's response
+                if (paymentComplete.status === 'PAID') {
+                    setPaymentStatus({
+                        status: 'PAID',
+                    });
+                    onSuccess?.(paymentId);
+                } else {
+                    setPaymentStatus({
+                        status: 'FAILED',
+                        message: paymentComplete.message || '결제 처리 중 오류가 발생했습니다.',
+                    });
+                    onError?.(paymentComplete.message || '결제 처리 중 오류가 발생했습니다.');
+                }
+            } else {
+                const errorText = await completeResponse.text();
+                setPaymentStatus({
+                    status: 'FAILED',
+                    message: errorText || '서버 연결에 실패했습니다.',
+                });
+                onError?.(errorText || '서버 연결에 실패했습니다.');
+            }
+
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : '결제 처리 중 오류가 발생했습니다.';
+            setPaymentStatus({
+                status: 'FAILED',
+                message: errorMessage
+            });
+            onError?.(errorMessage);
+        }
+    };
+
+    const isWaitingPayment = paymentStatus.status === 'PENDING';
+
+    // Dialog 닫기 핸들러
+    const handleCloseDialog = () => {
+        setPaymentStatus({ status: 'IDLE' });
+        setError(null);
+    };
+
+    return (
+        <Box sx={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            minHeight: '100vh',
+            backgroundColor: '#f8fafc',
+            padding: '24px'
+        }}>
+            <Paper elevation={3} sx={{
+                width: '100%',
+                maxWidth: '500px',
+                p: 4,
+                borderRadius: '16px',
+                ...paperStyles
+            }}>
+                <Typography variant="h4" sx={{ mb: 4, textAlign: 'center', fontWeight: 'bold' }}>
+                    구독 결제
+                </Typography>
+
+                {error && (
+                    <Alert severity="error" sx={{ mb: 3 }}>
+                        {error}
+                    </Alert>
+                )}
+
+                <FormControl fullWidth sx={{ mb: 4 }}>
+                    <InputLabel>구독 기간</InputLabel>
+                    <Select
+                        value={months}
+                        label="구독 기간"
+                        onChange={(e) => setMonths(Number(e.target.value))}
+                        disabled={isWaitingPayment}
+                    >
+                        <MenuItem value={1}>1개월 ({pricePerMonth.toLocaleString()}원)</MenuItem>
+                        <MenuItem value={3}>3개월 ({(pricePerMonth * 3).toLocaleString()}원)</MenuItem>
+                        <MenuItem value={6}>6개월 ({(pricePerMonth * 6).toLocaleString()}원)</MenuItem>
+                        <MenuItem value={12}>12개월 ({(pricePerMonth * 12).toLocaleString()}원)</MenuItem>
+                    </Select>
+                </FormControl>
+
+                <Box sx={{
+                    backgroundColor: '#f8fafc',
+                    p: 3,
+                    borderRadius: '8px',
+                    mb: 4
+                }}>
+                    <Typography variant="subtitle1" sx={{ mb: 2 }}>
+                        결제 금액
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 'bold', color: buttonColor }}>
+                        {(months * pricePerMonth).toLocaleString()}원
+                    </Typography>
+                </Box>
+
+                <Button
+                    fullWidth
+                    variant="contained"
+                    size="large"
+                    onClick={handlePayment}
+                    disabled={isWaitingPayment}
+                    sx={{
+                        py: 2,
+                        backgroundColor: buttonColor,
+                        '&:hover': {
+                            backgroundColor: buttonHoverColor
+                        }
+                    }}
+                >
+                    {isWaitingPayment ? (
+                        <CircularProgress size={24} sx={{ color: 'white' }} />
+                    ) : (
+                        '결제하기'
+                    )}
+                </Button>
+
+                {/* Material UI Dialog for payment result */}
+                <Dialog
+                    open={paymentStatus.status === 'FAILED' || paymentStatus.status === 'PAID'}
+                    onClose={handleCloseDialog}
+                    aria-labelledby="payment-dialog-title"
+                    aria-describedby="payment-dialog-description"
+                >
+                    <DialogTitle id="payment-dialog-title">
+                        {paymentStatus.status === 'PAID' ? '결제 성공' : '결제 실패'}
+                    </DialogTitle>
+                    <DialogContent>
+                        <DialogContentText id="payment-dialog-description">
+                            {paymentStatus.status === 'PAID'
+                                ? '결제가 성공적으로 처리되었습니다.'
+                                : paymentStatus.message || '결제 처리 중 오류가 발생했습니다.'}
+                        </DialogContentText>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={handleCloseDialog} color="primary" autoFocus>
+                            확인
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+            </Paper>
+        </Box>
+    );
+}
