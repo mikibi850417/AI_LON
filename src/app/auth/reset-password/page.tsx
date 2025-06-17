@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import Image from "next/image";
 import { Box, TextField, Button, Typography, CircularProgress, Paper, Alert } from "@mui/material";
@@ -11,10 +11,41 @@ import Link from 'next/link';
 const ResetPasswordPage = () => {
   // 환경 변수에서 authPath를 불러오며, 기본값은 "/auth"
   const authPath = process.env.NEXT_PUBLIC_AUTH_PATH || "/auth";
-  
+
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // 세션 확인 및 URL 파라미터 처리 추가
+  useEffect(() => {
+    const handleAuthStateChange = async () => {
+      // URL에서 access_token과 refresh_token 확인
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
+
+      if (accessToken && refreshToken) {
+        // 토큰이 있으면 세션 설정
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken
+        });
+
+        if (error) {
+          console.error('세션 설정 실패:', error);
+          setMessage({
+            type: "error",
+            text: "인증 토큰 처리 중 오류가 발생했습니다."
+          });
+        } else {
+          // 성공적으로 세션이 설정되면 update-password 페이지로 리디렉션
+          window.location.href = `${authPath}/update-password`;
+        }
+      }
+    };
+
+    handleAuthStateChange();
+  }, [authPath]);
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,7 +54,7 @@ const ResetPasswordPage = () => {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}${authPath}/update-password`,
+        redirectTo: `${window.location.origin}${authPath}/reset-password`,
       });
 
       if (error) {
@@ -35,10 +66,10 @@ const ResetPasswordPage = () => {
         text: "비밀번호 재설정 링크가 이메일로 전송되었습니다. 이메일을 확인해주세요."
       });
       setEmail("");
-    } catch (error: any) {
+    } catch (error: unknown) {
       setMessage({
         type: "error",
-        text: `비밀번호 재설정 요청 실패: ${error.message}`
+        text: `비밀번호 재설정 요청 실패: ${error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.'}`
       });
     } finally {
       setLoading(false);
@@ -107,17 +138,17 @@ const ResetPasswordPage = () => {
             alt="Company Logo"
             width={200}
             height={70}
-            style={{ 
-              objectFit: 'contain', 
-              marginBottom: '16px', 
-              position: 'relative', 
+            style={{
+              objectFit: 'contain',
+              marginBottom: '16px',
+              position: 'relative',
               zIndex: 1,
               filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))'
             }}
           />
-          <Typography variant="h5" sx={{ 
-            color: 'white', 
-            fontWeight: 'bold', 
+          <Typography variant="h5" sx={{
+            color: 'white',
+            fontWeight: 'bold',
             textShadow: '0 2px 4px rgba(0,0,0,0.3)',
             position: 'relative',
             zIndex: 1
@@ -128,10 +159,10 @@ const ResetPasswordPage = () => {
 
         <Box sx={{ p: 4 }}>
           {message && (
-            <Alert 
-              severity={message.type} 
-              sx={{ 
-                mb: 3, 
+            <Alert
+              severity={message.type}
+              sx={{
+                mb: 3,
                 borderRadius: '12px',
                 animation: message.type === 'error' ? 'pulse 2s infinite' : 'none',
                 '@keyframes pulse': {

@@ -28,44 +28,46 @@ import TheatersIcon from '@mui/icons-material/Theaters';
 // API 기본 URL 가져오기
 const getApiBaseUrl = (): string => process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
-// 날씨 아이콘 가져오기
-const getWeatherIcon = (weatherCode: number | null) => {
-    if (!weatherCode) return null;
+// 🌦️ 날씨 상태에 따른 아이콘 매핑
+const weatherIcons: { [key: string | number]: React.ReactNode } = {
+  1: <WbSunnyIcon sx={{ color: "gold" }} />,
+  2: <CloudIcon sx={{ color: "#78909c" }} />,
+  3: <CloudIcon sx={{ color: "#455a64" }} />,
+  4: <UmbrellaIcon sx={{ color: "skyblue" }} />,
+  5: <AcUnitIcon sx={{ color: "lightblue" }} />,
+};
 
-    switch (weatherCode) {
-        case 1:
-            return <WbSunnyIcon sx={{ color: "gold" }} />; // 맑음
-        case 2:
-            return <CloudIcon sx={{ color: "#78909c" }} />; // 구름많음 - 밝은 회색
-        case 3:
-            return <CloudIcon sx={{ color: "#455a64" }} />; // 흐림 - 어두운 회색
-        case 4:
-            return <UmbrellaIcon sx={{ color: "skyblue" }} />; // 비
-        case 5:
-            return <AcUnitIcon sx={{ color: "lightblue" }} />; // 눈
-        default:
-            return <CloudIcon sx={{ color: "#78909c" }} />;
-    }
+// 타입 변환 함수 수정
+const convertToNumber = (value: string | number | null | undefined): number => {
+    if (value === null || value === undefined) return 0;
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') return Number(value) || 0;
+    return 0;
 };
 
 // 온도에 따른 색상 설정
-const getTemperatureColor = (temp: number) => {
-    if (temp >= 30) return "#FF5252"; // 매우 더움
-    if (temp >= 25) return "#FF8A65"; // 더움
-    if (temp >= 20) return "#FFD54F"; // 따뜻함
-    if (temp >= 15) return "#81C784"; // 쾌적함
-    if (temp >= 10) return "#4FC3F7"; // 선선함
-    if (temp >= 5) return "#7986CB"; // 쌀쌀함
-    if (temp >= 0) return "#9575CD"; // 추움
-    return "#7E57C2"; // 매우 추움
+const getTemperatureColor = (temp: number | string | undefined) => {
+    const temperature = convertToNumber(temp);
+    if (temperature >= 30) return "#FF5252";
+    if (temperature >= 25) return "#FF8A65";
+    if (temperature >= 20) return "#FFD54F";
+    if (temperature >= 15) return "#81C784";
+    if (temperature >= 10) return "#4FC3F7";
+    if (temperature >= 5) return "#7986CB";
+    if (temperature >= 0) return "#9575CD";
+    return "#7E57C2";
 };
 
+// WeatherData 인터페이스 수정
 interface WeatherData {
     date: string;
-    weather_code: number;
-    min_temp: number;
-    max_temp: number;
+    weather_code: number | string;
+    min_temp: number | string;
+    max_temp: number | string;
     location_name: string;
+    weather?: string;
+    temperature?: number;
+    precipitation?: number | string;
 }
 
 interface HolidayData {
@@ -84,7 +86,49 @@ interface PerformanceData {
     cast?: string;
 }
 
-export default function EventWeatherTable({ locationCode, days = 7, dates }: { locationCode: string, days?: number, dates?: string[] }) {
+// FastAPI-style API response interfaces
+interface WeatherApiItem {
+    date: string;
+    weather_code: number;
+    min_temp: number;
+    max_temp: number;
+    location_name: string;
+}
+
+interface WeatherApiResponse {
+    items?: WeatherApiItem[];
+}
+
+interface HolidayApiItem {
+    holiday_name: string;
+    country: string;
+    holiday_start_date: string;
+    holiday_end_date?: string;
+}
+
+interface HolidayApiResponse {
+    items?: HolidayApiItem[];
+}
+
+interface PerformanceApiItem {
+    pid: string;
+    name: string;
+    p_date: string;
+    venue?: string;
+    cast?: string;
+}
+
+interface PerformanceApiResponse {
+    items?: PerformanceApiItem[];
+}
+
+interface EventWeatherTableProps {
+    locationCode?: string; // FastAPI의 선택적 파라미터 패턴
+    days?: number;
+    dates?: string[];
+}
+
+export default function EventWeatherTable({ locationCode, days = 7, dates }: EventWeatherTableProps) {
     const [weatherData, setWeatherData] = useState<Record<string, WeatherData>>({});
     const [holidayData, setHolidayData] = useState<Record<string, HolidayData[]>>({});
     const [performanceData, setPerformanceData] = useState<Record<string, PerformanceData[]>>({});
@@ -106,7 +150,7 @@ export default function EventWeatherTable({ locationCode, days = 7, dates }: { l
 
     useEffect(() => {
         if (!locationCode || localDates.length === 0) return;
-        
+
         // 클라이언트 사이드에서만 현재 시간 설정
         setLastUpdated(new Date().toLocaleString('ko-KR'));
 
@@ -125,16 +169,14 @@ export default function EventWeatherTable({ locationCode, days = 7, dates }: { l
                 const res = await fetch(url);
                 if (!res.ok) {
                     throw new Error(`API 응답 오류: ${res.status}`);
-                }
-
-                const result = await res.json();
+                } const result: WeatherApiResponse | WeatherApiItem[] = await res.json();
                 console.log("날씨 데이터 응답:", result); // 디버깅용 로그 추가
 
                 const weatherMap: Record<string, WeatherData> = {};
 
                 // API 응답 구조에 따라 데이터 처리 방식 수정
-                if (result.items && Array.isArray(result.items)) {
-                    result.items.forEach((item: any) => {
+                if ('items' in result && Array.isArray(result.items)) {
+                    result.items.forEach((item: WeatherApiItem) => {
                         // 날짜 형식 확인 및 처리
                         const date = item.date?.slice(0, 10);
                         if (date) {
@@ -149,7 +191,7 @@ export default function EventWeatherTable({ locationCode, days = 7, dates }: { l
                     });
                 } else if (Array.isArray(result)) {
                     // 배열 형태로 응답이 오는 경우
-                    result.forEach((item: any) => {
+                    result.forEach((item: WeatherApiItem) => {
                         const date = item.date?.slice(0, 10);
                         if (date) {
                             weatherMap[date] = {
@@ -191,13 +233,11 @@ export default function EventWeatherTable({ locationCode, days = 7, dates }: { l
                     console.error(`Holiday API 오류: ${res.status}`);
                     setHolidayData({}); // 오류 시에도 빈 객체 설정
                     return; // 오류 시 여기서 함수 종료
-                }
-
-                try {
-                    const result = rawText ? JSON.parse(rawText) : {};
+                } try {
+                    const result: HolidayApiResponse | HolidayApiItem[] | Record<string, HolidayApiItem[]> = rawText ? JSON.parse(rawText) : {};
                     const holidayMap: Record<string, HolidayData[]> = {};
 
-                    const addHoliday = (item: any) => {
+                    const addHoliday = (item: HolidayApiItem) => {
                         if (!item || !item.holiday_start_date) return; // 유효하지 않은 항목 건너뛰기
 
                         try {
@@ -234,10 +274,10 @@ export default function EventWeatherTable({ locationCode, days = 7, dates }: { l
                         }
                     };
 
-                    const flatten = (item: any): HolidayData => {
+                    const flatten = (item: HolidayApiItem): HolidayData => {
                         try {
                             return {
-                                date: item.date || "",
+                                date: "", // 이 값은 나중에 설정됨
                                 holiday_name: item.holiday_name || "휴일",
                                 country: item.country || "대한민국",
                                 holiday_start_date: item.holiday_start_date || "",
@@ -257,17 +297,20 @@ export default function EventWeatherTable({ locationCode, days = 7, dates }: { l
                     };
 
                     // 안전하게 배열 확인
-                    const safeArray = (arr: any): any[] => {
+                    const safeArray = (arr: unknown): HolidayApiItem[] => {
                         return Array.isArray(arr) ? arr : [];
                     };
 
-                    if (result?.items && Array.isArray(result.items)) {
+                    if ('items' in result && Array.isArray(result.items)) {
                         safeArray(result.items).forEach(addHoliday);
                     } else if (Array.isArray(result)) {
                         safeArray(result).forEach(addHoliday);
-                    } else if (typeof result === "object" && result !== null) {
-                        Object.entries(result).forEach(([d, arr]) => {
-                            holidayMap[d] = Array.isArray(arr) ? (arr as any[]).map(flatten) : [];
+                    } else if (typeof result === "object" && result !== null && !Array.isArray(result) && !('items' in result)) {
+                        Object.entries(result as Record<string, HolidayApiItem[]>).forEach(([d, arr]) => {
+                            holidayMap[d] = Array.isArray(arr) ? arr.map((item) => ({
+                                ...flatten(item),
+                                date: d
+                            })) : [];
                         });
                     }
 
@@ -294,28 +337,27 @@ export default function EventWeatherTable({ locationCode, days = 7, dates }: { l
 
                 // API 호출
                 const res = await fetch(url);
-                
+
                 if (!res.ok) {
                     console.error(`공연 API 오류: ${res.status}`);
                     setPerformanceData({});
                     return;
                 }
-                
-                const result = await res.json();
+                const result: PerformanceApiResponse | PerformanceApiItem[] = await res.json();
                 console.log("공연 데이터 응답:", result);
 
                 // 데이터 가공
                 const performanceMap: Record<string, PerformanceData[]> = {};
 
                 // 응답 구조에 따라 데이터 처리 방식 수정
-                if (result?.items && Array.isArray(result.items)) {
+                if ('items' in result && Array.isArray(result.items)) {
                     // items 배열이 있는 경우
-                    result.items.forEach((item: any) => {
+                    result.items.forEach((item: PerformanceApiItem) => {
                         processPerformanceItem(item, performanceMap);
                     });
                 } else if (Array.isArray(result)) {
                     // 응답이 바로 배열인 경우
-                    result.forEach((item: any) => {
+                    result.forEach((item: PerformanceApiItem) => {
                         processPerformanceItem(item, performanceMap);
                     });
                 }
@@ -329,15 +371,15 @@ export default function EventWeatherTable({ locationCode, days = 7, dates }: { l
         };
 
         // 공연 데이터 항목 처리 헬퍼 함수
-        const processPerformanceItem = (item: any, performanceMap: Record<string, PerformanceData[]>) => {
+        const processPerformanceItem = (item: PerformanceApiItem, performanceMap: Record<string, PerformanceData[]>) => {
             // p_date 필드에서 날짜 추출 (event_calendar/page.tsx와 일치시킴)
             const date = item.p_date?.slice(0, 10);
-            
+
             if (date) {
                 if (!performanceMap[date]) {
                     performanceMap[date] = [];
                 }
-                
+
                 performanceMap[date].push({
                     pid: item.pid || "",
                     name: item.name || "공연 정보 없음",
@@ -523,13 +565,13 @@ export default function EventWeatherTable({ locationCode, days = 7, dates }: { l
                                         {weather ? (
                                             <Box>
                                                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
-                                                    {getWeatherIcon(weather.weather_code)}
+                                                    {weatherIcons[convertToNumber(weather.weather_code)] || <CloudIcon sx={{ color: "#78909c" }} />}
                                                     <Typography variant="body2" sx={{ ml: 0.5 }}>
                                                         {weather.weather_code === 1 ? '맑음' :
                                                             weather.weather_code === 2 ? '구름많음' :
                                                                 weather.weather_code === 3 ? '흐림' :
                                                                     weather.weather_code === 4 ? '비' :
-                                                                        weather.weather_code === 5 ? '눈' : '정보 없음'}
+                                                                        weather.weather_code === 5 ? '눈' : '알 수 없음'}
                                                     </Typography>
                                                 </Box>
                                                 <Typography variant="body2">

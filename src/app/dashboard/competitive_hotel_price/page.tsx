@@ -11,6 +11,52 @@ import HotelPredictPrice from "@/lib/components/HotelPredictPrice";
 import { fetchHotelData, buildPivotTableFromEntries, computeLineChartDataAllRows } from "./utils";
 import PriceChangeIcon from '@mui/icons-material/PriceChange';
 
+// 타입 정의 (FastAPI 스타일)
+interface HotelPriceData {
+  hotel_name: string;
+  date: string;
+  room_price: number;
+  site?: string;
+  room_type?: string;
+}
+
+interface PivotTableRow {
+  hotel_name: string;
+  hotelName?: string;
+  id?: string;
+  [date: string]: string | number | null | undefined;
+}
+
+interface BarChartDataset {
+  label: string;
+  data: (number | null)[];
+  backgroundColor: string;
+  siteLabels?: string[];
+}
+
+interface LineChartDataset {
+  label: string;
+  data: (number | null)[];
+  fill: boolean;
+  borderDash?: number[];
+  borderColor: string;
+}
+
+interface BarChartData {
+  labels: string[];
+  datasets: BarChartDataset[];
+}
+
+interface LineChartData {
+  labels: string[];
+  datasets: LineChartDataset[];
+}
+
+interface UserRegion {
+  location_code: string;
+  region: string;
+}
+
 // Chart.js registration
 import {
   Chart as ChartJS,
@@ -57,14 +103,14 @@ export default function CompetitiveHotelPrice() {
       .split("T")[0],
   });
   const [loading, setLoading] = useState(false);
-  const [tableData, setTableData] = useState<any[]>([]);
-  const [pivotTableRows, setPivotTableRows] = useState<any[]>([]);
+  const [tableData, setTableData] = useState<HotelPriceData[]>([]);
+  const [pivotTableRows, setPivotTableRows] = useState<PivotTableRow[]>([]);
   const [pivotTableDates, setPivotTableDates] = useState<string[]>([]);
-  const [lineChartData, setLineChartData] = useState<any>(null);
-  const [chartData, setChartData] = useState<any>(null);
+  const [lineChartData, setLineChartData] = useState<LineChartData | null>(null);
+  const [chartData, setChartData] = useState<BarChartData | null>(null);
   const [mapCenter, setMapCenter] = useState({ lat: 37.5665, lng: 126.9780 });
   const [loadingFavorites, setLoadingFavorites] = useState(true);
-  const [userRegion, setUserRegion] = useState<{ location_code: string; region: string } | null>(null);
+  const [userRegion, setUserRegion] = useState<UserRegion | null>(null);
   const [openPredictDialog, setOpenPredictDialog] = useState(false);
 
   // Fetch user data from Supabase
@@ -95,7 +141,7 @@ export default function CompetitiveHotelPrice() {
           // 지도 중심점 설정 - 유효한 숫자인지 확인 후 설정
           const lat = parseFloat(addrInfo.latitude);
           const lng = parseFloat(addrInfo.longitude);
-          
+
           if (!isNaN(lat) && !isNaN(lng)) {
             setMapCenter({
               lat: lat,
@@ -208,7 +254,7 @@ export default function CompetitiveHotelPrice() {
       console.log(`Fetching prices: ${dateRange.start} ~ ${dateRange.end} (inclusive)`);
       const hotelData = await fetchHotelData(selectedHotels, dateRange.start, dateRange.end);
 
-      let allRows: any[] = [];
+      let allRows: HotelPriceData[] = [];
       hotelData.forEach(({ data }) => {
         if (Array.isArray(data)) {
           allRows = [...allRows, ...data];
@@ -223,19 +269,21 @@ export default function CompetitiveHotelPrice() {
       if (selectedHotels.length === 1) {
         const { data } = hotelData[0];
         const datesSet = new Set<string>();
-        data.forEach((item: any) => datesSet.add(item.date));
+        data.forEach((item) => datesSet.add(item.date));
         const dates = Array.from(datesSet).sort();
 
         const sitesSet = new Set<string>();
-        data.forEach((item: any) => sitesSet.add(item.site));
+        data.forEach((item) => {
+          if (item.site) sitesSet.add(item.site);
+        });
         const sites = Array.from(sitesSet);
 
-        const datasets = sites.map((site, index) => {
+        const datasets: BarChartDataset[] = sites.map((site, index) => {
           const siteData = dates.map((date) => {
             const entries = data.filter(
-              (item: any) => item.date === date && item.site === site
+              (item) => item.date === date && item.site === site
             );
-            return entries.length > 0 ? Math.min(...entries.map((e: any) => e.room_price)) : null;
+            return entries.length > 0 ? Math.min(...entries.map((e) => e.room_price)) : null;
           });
           return {
             label: site,
@@ -248,28 +296,27 @@ export default function CompetitiveHotelPrice() {
       } else {
         const datesSet = new Set<string>();
         hotelData.forEach(({ data }) => {
-          data.forEach((item: any) => datesSet.add(item.date));
+          data.forEach((item) => datesSet.add(item.date));
         });
         const dates = Array.from(datesSet).sort();
 
-        const datasets = hotelData.map((hotelItem, index) => {
+        const datasets: BarChartDataset[] = hotelData.map((hotelItem, index) => {
           const hotelDataByDate: Record<string, { room_price: number; site: string }> = {};
 
-          hotelItem.data.forEach((item: any) => {
+          hotelItem.data.forEach((item) => {
             const date = item.date;
             if (hotelDataByDate[date]) {
               if (item.room_price < hotelDataByDate[date].room_price) {
-                hotelDataByDate[date] = { room_price: item.room_price, site: item.site };
+                hotelDataByDate[date] = { room_price: item.room_price, site: item.site || '' };
               }
             } else {
-              hotelDataByDate[date] = { room_price: item.room_price, site: item.site };
+              hotelDataByDate[date] = { room_price: item.room_price, site: item.site || '' };
             }
           });
 
           const priceData = dates.map((date) =>
             hotelDataByDate[date] ? hotelDataByDate[date].room_price : null
           );
-
           const siteLabels = dates.map((date) =>
             hotelDataByDate[date] ? hotelDataByDate[date].site : ""
           );
@@ -278,7 +325,7 @@ export default function CompetitiveHotelPrice() {
             label: hotelItem.hotelName,
             data: priceData,
             backgroundColor: `hsl(${index * 60}, 50%, 80%)`,
-            siteLabels,
+            siteLabels: siteLabels,
           };
         });
 
@@ -296,12 +343,15 @@ export default function CompetitiveHotelPrice() {
     if (!pivotTableRows.length) return [];
 
     // 통계 행(avg, max, min)을 제외한 실제 호텔 행 추출
-    const hotelRows = pivotTableRows.filter(row => !['avg', 'max', 'min'].includes(row.id));
+    const hotelRows = pivotTableRows.filter(row => row.id && !['avg', 'max', 'min'].includes(row.id));
 
     // 선택된 날짜의 가격 데이터 추출 (null이 아닌 값만)
     return hotelRows
-      .map(row => row[date])
-      .filter(price => price !== null)
+      .map(row => {
+        const price = row[date];
+        return typeof price === 'number' ? price : null;
+      })
+      .filter((price): price is number => price !== null)
       .sort((a, b) => a - b);
   };
 
@@ -327,14 +377,14 @@ export default function CompetitiveHotelPrice() {
       position: 'relative'  // Floating Button을 위한 position 설정
     }}>
       {/* Header section */}
-      <h1 className="text-2xl font-bold mb-4" style={{ 
+      <h1 className="text-2xl font-bold mb-4" style={{
         color: '#2c3e50',
         padding: '16px 0',
         borderBottom: '2px solid #e2e8f0',
         display: 'flex',
         alignItems: 'center'
       }}>
-        <PriceChangeIcon style={{ marginRight: '8px', color: '#2c3e50' }} /> 
+        <PriceChangeIcon style={{ marginRight: '8px', color: '#2c3e50' }} />
         Hotel Prices
       </h1>
 
@@ -445,14 +495,14 @@ export default function CompetitiveHotelPrice() {
 
       {/* Floating Action Button - 가격 조회 결과가 있을 때만 표시 */}
       {pivotTableRows.length > 0 && pivotTableDates.length > 0 && (
-        <Tooltip 
-          title="AI 가격 예측" 
+        <Tooltip
+          title="AI 가격 예측"
           placement="left"
           componentsProps={{
             tooltip: {
               sx: {
-                fontSize: '1.2rem',  
-                padding: '8px 12px',  
+                fontSize: '1.2rem',
+                padding: '8px 12px',
                 backgroundColor: 'rgba(44, 62, 80, 0.9)',
                 boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
                 transform: 'translateY(-5px)',
@@ -461,8 +511,8 @@ export default function CompetitiveHotelPrice() {
             }
           }}
         >
-          <Fab 
-            color="primary" 
+          <Fab
+            color="primary"
             aria-label="add"
             sx={{
               position: 'fixed',
@@ -488,8 +538,8 @@ export default function CompetitiveHotelPrice() {
             }}
             onClick={handleOpenPredictDialog}
           >
-            <Avatar 
-              sx={{ 
+            <Avatar
+              sx={{
                 width: 120,
                 height: 120,
                 backgroundColor: 'transparent',
@@ -501,12 +551,12 @@ export default function CompetitiveHotelPrice() {
                 }
               }}
             >
-              <Image 
-                src="/webicon.png" 
-                alt="예측 아이콘" 
+              <Image
+                src="/webicon.png"
+                alt="예측 아이콘"
                 width={120}
                 height={120}
-                style={{ 
+                style={{
                   objectFit: 'contain',
                   filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))',
                   transition: 'all 0.3s ease'
@@ -518,8 +568,8 @@ export default function CompetitiveHotelPrice() {
       )}
 
       {/* 예측된 호텔 가격 다이얼로그 */}
-      <Dialog 
-        open={openPredictDialog} 
+      <Dialog
+        open={openPredictDialog}
         onClose={handleClosePredictDialog}
         maxWidth="md"
         fullWidth
@@ -557,9 +607,9 @@ export default function CompetitiveHotelPrice() {
         >
           <CloseIcon />
         </IconButton>
-        
-        <Box sx={{ 
-          mt: { xs: 1, sm: 2 }, 
+
+        <Box sx={{
+          mt: { xs: 1, sm: 2 },
           mb: { xs: 2, sm: 4 },
           overflowY: 'auto',
           maxHeight: { xs: 'calc(100vh - 120px)', sm: 'calc(100vh - 180px)' },

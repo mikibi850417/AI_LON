@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Calendar from 'react-calendar';
-import { Box, Typography, Paper, CircularProgress, Button, Divider } from '@mui/material';
+import { Box, Typography, CircularProgress, Button, Divider } from '@mui/material';
 import 'react-calendar/dist/Calendar.css';
 import './CustomCalendar.css';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
@@ -135,6 +135,18 @@ const EventCalendarGrid = () => {
   const [isMonthChanging, setIsMonthChanging] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'events' | 'holidays'>('events');
 
+  const loadPerformanceDetails = useCallback(async (dateStr?: string) => {
+    const targetDate = dateStr || selectedDate;
+    setPerformanceDetails([]);
+    const performances = groupedEvents[targetDate] || [];
+    const performanceIds = performances.map((event) => event.pid);
+    if (performanceIds.length === 0) return;
+    setDetailsLoading(true);
+    const details = await fetchPerformanceDetails(performanceIds);
+    setPerformanceDetails(details);
+    setDetailsLoading(false);
+  }, [groupedEvents, selectedDate]);
+
   // 월 변경 시 공연 및 휴일 정보 함께 불러오기
   useEffect(() => {
     async function fetchAndSetData() {
@@ -155,18 +167,7 @@ const EventCalendarGrid = () => {
     if (!isMonthChanging && groupedEvents[selectedDate]) {
       loadPerformanceDetails(selectedDate);
     }
-  }, [groupedEvents, selectedDate, isMonthChanging]);
-
-  const loadPerformanceDetails = async (dateStr: string) => {
-    setPerformanceDetails([]);
-    const performances = groupedEvents[dateStr] || [];
-    const performanceIds = performances.map((event) => event.pid);
-    if (performanceIds.length === 0) return;
-    setDetailsLoading(true);
-    const details = await fetchPerformanceDetails(performanceIds);
-    setPerformanceDetails(details);
-    setDetailsLoading(false);
-  };
+  }, [groupedEvents, selectedDate, isMonthChanging, loadPerformanceDetails]);
 
   const handleDateClick = (date: Date) => {
     const dateStr = formatDate(date);

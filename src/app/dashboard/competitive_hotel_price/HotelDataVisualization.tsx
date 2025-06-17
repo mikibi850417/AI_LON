@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState } from "react";
 import { Box, Tabs, Tab, Checkbox, Typography } from "@mui/material";
 import { Bar, Line } from "react-chartjs-2";
 import PriceChangeIcon from "@mui/icons-material/PriceChange";
@@ -42,11 +42,42 @@ function TabPanel(props: TabPanelProps) {
     );
 }
 
+// FastAPI 스타일 Chart.js 데이터 모델 정의
+interface ChartDataset {
+    label: string;
+    data: (number | null)[];
+    backgroundColor?: string;
+    borderColor?: string;
+    borderWidth?: number;
+    borderRadius?: number;
+    hoverBackgroundColor?: string;
+    siteLabels?: string[];
+    borderDash?: number[];
+    pointRadius?: number;
+    pointBackgroundColor?: string;
+    pointBorderColor?: string;
+    pointBorderWidth?: number;
+    tension?: number;
+    fill?: boolean;
+}
+
+interface ChartData {
+    labels: string[];
+    datasets: ChartDataset[];
+}
+
+interface PivotTableRow {
+    hotel_name: string;
+    hotelName?: string;
+    id?: string;
+    [date: string]: string | number | null | undefined;
+}
+
 // Add this export to make the props accessible to other components
 export type HotelDataVisualizationProps = {
-    chartData: any;
-    lineChartData: any;
-    pivotTableRows: any[];
+    chartData: ChartData | null;
+    lineChartData: ChartData | null;
+    pivotTableRows: PivotTableRow[];
     pivotTableDates: string[];
     selectedHotels: string[];
     favoriteHotels: string[];
@@ -65,23 +96,13 @@ export default function HotelDataVisualization({
     const [showMaxPrice, setShowMaxPrice] = useState(true);
     const [showMinPrice, setShowMinPrice] = useState(true);
 
-    // Chart reference for updating
-    const lineChartRef = useRef<any>(null);
-
-    // Update chart when data or display options change
-    useEffect(() => {
-        if (lineChartRef.current && lineChartData) {
-            lineChartRef.current.update();
-        }
-    }, [lineChartData, showAvgPrice, showMaxPrice, showMinPrice]);
-
     // Get filtered bar chart data (excluding statistic rows)
     const getFilteredBarChartData = () => {
         if (!chartData) return null;
 
         return {
             ...chartData,
-            datasets: chartData.datasets.filter((dataset: any) => {
+            datasets: chartData.datasets.filter((dataset: ChartDataset) => {
                 // Don't show statistic rows in bar chart
                 if (dataset.label === '평균 가격' || dataset.label === '최고 가격' || dataset.label === '최저 가격') {
                     return false;
@@ -118,11 +139,11 @@ export default function HotelDataVisualization({
                 boxPadding: 6,
                 usePointStyle: true,
                 callbacks: {
-                    label: function (context: any) {
-                        const label = context.dataset.label || "";
-                        const value = context.parsed.y;
-                        if (selectedHotels.length > 1 && context.dataset.siteLabels) {
-                            const site = context.dataset.siteLabels[context.dataIndex];
+                    label: function (tooltipItem: { dataset: { label?: string; siteLabels?: string[] }; dataIndex: number; parsed: { y: number } }) {
+                        const label = tooltipItem.dataset.label || "";
+                        const value = tooltipItem.parsed.y;
+                        if (selectedHotels.length > 1 && tooltipItem.dataset.siteLabels) {
+                            const site = tooltipItem.dataset.siteLabels[tooltipItem.dataIndex];
                             return `${label}: ₩${value.toLocaleString()} (Site: ${site})`;
                         }
                         return `${label}: ₩${value.toLocaleString()}`;
@@ -148,8 +169,8 @@ export default function HotelDataVisualization({
                 },
                 ticks: {
                     color: '#64748b',
-                    callback: function (value: any) {
-                        return '₩' + value.toLocaleString();
+                    callback: function (value: string | number) {
+                        return '₩' + Number(value).toLocaleString();
                     }
                 }
             },
@@ -185,9 +206,9 @@ export default function HotelDataVisualization({
                 boxPadding: 6,
                 usePointStyle: true,
                 callbacks: {
-                    label: function (context: any) {
-                        const label = context.dataset.label || "";
-                        const value = context.raw;
+                    label: function (tooltipItem: { dataset: { label?: string }; raw: unknown }) {
+                        const label = tooltipItem.dataset.label || "";
+                        const value = tooltipItem.raw as number | null;
                         return `${label}: ₩${value?.toLocaleString() || "N/A"}`;
                     },
                 },
@@ -211,8 +232,8 @@ export default function HotelDataVisualization({
                 },
                 ticks: {
                     color: '#64748b',
-                    callback: function (value: any) {
-                        return '₩' + value.toLocaleString();
+                    callback: function (value: string | number) {
+                        return '₩' + Number(value).toLocaleString();
                     }
                 }
             },
@@ -310,7 +331,7 @@ export default function HotelDataVisualization({
                                 <Bar
                                     data={{
                                         ...getFilteredBarChartData(),
-                                        datasets: getFilteredBarChartData()?.datasets.map((dataset: any, index: number) => ({
+                                        datasets: getFilteredBarChartData()?.datasets.map((dataset: ChartDataset, index: number) => ({
                                             ...dataset,
                                             backgroundColor: CHART_COLORS[index % CHART_COLORS.length],
                                             borderColor: CHART_COLORS[index % CHART_COLORS.length],
@@ -334,8 +355,8 @@ export default function HotelDataVisualization({
                                                 grid: { color: 'rgba(0, 0, 0, 0.05)' },
                                                 ticks: {
                                                     color: '#64748b',
-                                                    callback: function (value: any) {
-                                                        return '₩' + value.toLocaleString();
+                                                    callback: function (value: string | number) {
+                                                        return '₩' + Number(value).toLocaleString();
                                                     }
                                                 }
                                             }
@@ -419,17 +440,16 @@ export default function HotelDataVisualization({
 
                                 {lineChartData ? (
                                     <Line
-                                        ref={lineChartRef}
                                         data={{
                                             labels: lineChartData.labels,
                                             datasets: lineChartData.datasets
-                                                .filter((dataset: any) => {
+                                                .filter((dataset: ChartDataset) => {
                                                     if (dataset.label === '평균 가격' && !showAvgPrice) return false;
                                                     if (dataset.label === '최고 가격' && !showMaxPrice) return false;
                                                     if (dataset.label === '최저 가격' && !showMinPrice) return false;
                                                     return true;
                                                 })
-                                                .map((dataset: any) => {
+                                                .map((dataset: ChartDataset) => {
                                                     // Special colors for statistic rows
                                                     let color;
                                                     if (dataset.label === '평균 가격') color = '#2c3e50';
@@ -467,8 +487,8 @@ export default function HotelDataVisualization({
                                                     grid: { color: 'rgba(0, 0, 0, 0.05)' },
                                                     ticks: {
                                                         color: '#64748b',
-                                                        callback: function (value: any) {
-                                                            return '₩' + value.toLocaleString();
+                                                        callback: function (value: string | number) {
+                                                            return '₩' + Number(value).toLocaleString();
                                                         }
                                                     }
                                                 }

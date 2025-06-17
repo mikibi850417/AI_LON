@@ -14,6 +14,17 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 
 ChartJS.register(...registerables);
 
+interface HotelPriceEntry {
+  hotel_name: string;
+  date: string;
+  avg_price: string | number;
+}
+
+interface PCADataItem {
+  index: string;
+  PC1: number;
+}
+
 // 기본 날짜 결정 함수: 오늘 날짜 반환
 const getDefaultDate = (): string => {
   const now = new Date();
@@ -53,16 +64,16 @@ export default function CompetitorHotelTrends() {
         `${API_BASE}/api/competitor-hotels/price?user_id=0&price_type=avg&start_date=${start}&end_date=${end}`
       );
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
+      const data: HotelPriceEntry[] = await response.json();
       // 각 레코드: { hotel_name, date, avg_price }
       const groupedData: Record<string, { dates: string[]; prices: number[] }> = {};
-      data.forEach((entry: any) => {
+      data.forEach((entry: HotelPriceEntry) => {
         const { hotel_name, date, avg_price } = entry;
         if (!groupedData[hotel_name]) {
           groupedData[hotel_name] = { dates: [], prices: [] };
         }
         groupedData[hotel_name].dates.push(date);
-        groupedData[hotel_name].prices.push(parseFloat(avg_price));
+        groupedData[hotel_name].prices.push(typeof avg_price === 'string' ? parseFloat(avg_price) : avg_price);
       });
       setHotelData(groupedData);
     } catch (error) {
@@ -81,13 +92,13 @@ export default function CompetitorHotelTrends() {
         `${API_BASE}/api/competitor-hotels/pca?start_date=${start}&end_date=${end}&return_df_pca=true&return_df_segments=false`
       );
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
+      const data: { df_pca: PCADataItem[] } = await response.json();
       // data.df_pca: 배열 형태 [{ index, PC1, ... }, ...]
       if (data.df_pca && Array.isArray(data.df_pca)) {
-        const dates = data.df_pca.map((item: any) =>
+        const dates = data.df_pca.map((item: PCADataItem) =>
           new Date(item.index).toISOString().split("T")[0]
         );
-        const pc1 = data.df_pca.map((item: any) => item.PC1);
+        const pc1 = data.df_pca.map((item: PCADataItem) => item.PC1);
         setPcaData({ dates, pc1 });
       }
     } catch (error) {
@@ -104,10 +115,10 @@ export default function CompetitorHotelTrends() {
   }, [startDate]);
 
   // 모든 호텔의 날짜가 동일하다고 가정하여, 첫 호텔의 날짜 배열을 x축 라벨로 사용
-  const commonLabels =
-    Object.keys(hotelData).length > 0
-      ? hotelData[Object.keys(hotelData)[0]].dates
-      : [];
+  // const commonLabels =
+  //   Object.keys(hotelData).length > 0
+  //     ? hotelData[Object.keys(hotelData)[0]].dates
+  //     : [];
 
   return (
     <Box sx={{
@@ -262,7 +273,7 @@ export default function CompetitorHotelTrends() {
 
                         // y축 0 위치 계산
                         const yScale = chart.scales.y;
-                        const zeroY = yScale.getPixelForValue(0);
+                        // const zeroY = yScale.getPixelForValue(0); // 현재 사용되지 않음
 
                         // 그라데이션 생성
                         const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
@@ -544,7 +555,8 @@ const chartColors = [
   { backgroundColor: "rgba(22, 160, 133, 0.2)", borderColor: "#16a085" },
 ];
 
-// 그라데이션 생성 함수
+/*
+// 그라데이션 생성 함수 - 현재 사용되지 않음
 const createGradient = (
   context: {
     p0: { x: number; y: number; parsed: { y: number } };
@@ -560,3 +572,4 @@ const createGradient = (
   gradient.addColorStop(1, colorEnd);
   return gradient;
 };
+*/

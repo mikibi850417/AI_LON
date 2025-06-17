@@ -4,36 +4,41 @@ import React, { useState } from 'react';
 import { Box, Typography, TextField, Button, MenuItem, CircularProgress, Card, CardContent, Alert, Fade, Zoom, Grow } from "@mui/material";
 import CalculateIcon from '@mui/icons-material/Calculate';
 import { supabase } from '@/lib/supabaseClient';
-import { ApiError } from '@supabase/supabase-js';
 
-// 표준화된 인터페이스 정의
-export interface PriceDataItem {
-    date: string;
-    price: number;
-}
+// 사용하지 않는 인터페이스들 제거
+// export interface PriceDataItem - 사용되지 않음
+// export interface UserRegion - 이미 props에서 정의됨
+// export interface PredictionResult - 사용되지 않음
 
 export interface UserRegion {
     location_code: string;
     region: string;
 }
 
-export interface PredictionResult {
-    predicted_price: number;
-    details?: Record<string, unknown>;
+export interface StatsInfo {
+    hotels?: string[];
+    hotelCount?: number;
+    dateCount?: number;
+    avgPrice?: number | null;
+    minPrice?: number | null;
+    maxPrice?: number | null;
+    lastDate?: string | null;
+    mean?: number;
+    median?: number;
+    min?: number;
+    max?: number;
+    count?: number;
+    std?: number;
 }
 
 export interface HotelPredictPriceProps {
-    // 필수 속성
     dates: string[];
-
-
     userRegion: UserRegion | null;
     getPricesForDate: (date: string) => number[];
-
-    // 선택적 속성
     title?: string;
     apiEndpoint?: string;
     extraInfo?: React.ReactNode;
+    statsInfo?: StatsInfo;
 }
 
 export default function HotelPredictPrice({
@@ -42,7 +47,8 @@ export default function HotelPredictPrice({
     getPricesForDate,
     title = "호텔 가격 추천",
     apiEndpoint = process.env.NEXT_PUBLIC_API_BASE_URL ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/price/predict` : "https://ailon.iptime.org:8000/api/price/predict",
-    extraInfo
+    extraInfo,
+    statsInfo
 }: HotelPredictPriceProps) {
     const [selectedDate, setSelectedDate] = useState<string>(dates[0] || "");
     const [occupancy, setOccupancy] = useState<number>(50);
@@ -52,8 +58,6 @@ export default function HotelPredictPrice({
         3: null
     });
     const [predicting, setPredicting] = useState<boolean>(false);
-
-    // 애니메이션을 위한 상태 추가
     const [showResults, setShowResults] = useState<boolean>(false);
     const [animationStep, setAnimationStep] = useState<number>(0);
 
@@ -63,7 +67,6 @@ export default function HotelPredictPrice({
             return;
         }
 
-        // 선택된 날짜에 대한 가격 데이터 가져오기
         const prices = getPricesForDate(selectedDate);
 
         if (prices.length === 0) {
@@ -77,7 +80,6 @@ export default function HotelPredictPrice({
         setAnimationStep(0);
 
         try {
-            // 세 가지 리스크 레벨에 대해 병렬로 API 호출
             const results = await Promise.all([1, 2, 3].map(async (riskLevel) => {
                 const payload = {
                     date: selectedDate,
@@ -85,15 +87,12 @@ export default function HotelPredictPrice({
                     address: userRegion.location_code,
                     occupancy,
                     risk: riskLevel,
-                    prices: prices.slice(0, 5), // 상위 5개 최저가만 사용
+                    prices: prices.slice(0, 5),
                 };
 
-                // API 호출 로그
-                console.log(`[${riskLevel}] API 요청:`, payload);
+                // 중복된 로그 제거
+                console.log(`리스크 ${riskLevel} API 요청:`, payload);
 
-                console.log(`리스크 ${riskLevel} API 요청 페이로드:`, payload);
-
-                // Supabase 세션 가져오기
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
                 if (sessionError || !session) {
@@ -115,25 +114,21 @@ export default function HotelPredictPrice({
                 }
 
                 const result = await response.json();
-                console.log(`리스크 ${riskLevel} API 응답 결과:`, result);
+                console.log(`리스크 ${riskLevel} API 응답:`, result);
                 return { risk: riskLevel, result };
             }));
 
-            // 결과 업데이트
             const newResults = { ...predictionResults };
             results.forEach(({ risk, result }) => {
                 newResults[risk] = `₩${parseInt(result.predicted_price).toLocaleString()}`;
             });
             setPredictionResults(newResults);
 
-            // 애니메이션 시작
             setShowResults(true);
-
-            // 단계적 애니메이션을 위한 타이머 설정
             setTimeout(() => setAnimationStep(1), 300);
             setTimeout(() => setAnimationStep(2), 600);
             setTimeout(() => setAnimationStep(3), 900);
-        } catch (error: Error | ApiError) {
+        } catch (error: unknown) {
             console.error("예측 API 호출 실패:", error instanceof Error ? error.message : error);
             setPredictionResults({
                 1: "예측 실패. 네트워크 상태를 확인하거나 다시 시도해주세요.",
@@ -141,7 +136,7 @@ export default function HotelPredictPrice({
                 3: "예측 실패. 네트워크 상태를 확인하거나 다시 시도해주세요."
             });
             setShowResults(true);
-            setAnimationStep(3); // 에러 시 모든 결과 한번에 표시
+            setAnimationStep(3);
         } finally {
             setPredicting(false);
         }
@@ -169,7 +164,6 @@ export default function HotelPredictPrice({
                 gap: 4,
                 mt: 3
             }}>
-                {/* 가격 예측 입력 폼 */}
                 <Card sx={{
                     borderRadius: 4,
                     boxShadow: '0 20px 40px rgba(0,0,0,0.08), 0 10px 20px rgba(49, 130, 206, 0.1)',
@@ -186,12 +180,8 @@ export default function HotelPredictPrice({
                         p: 4,
                         background: 'radial-gradient(circle at top right, rgba(49, 130, 206, 0.05), transparent 70%)'
                     }}>
-                        {/* 사용자 지역 정보 - 텍스트 삭제하고 기능만 유지 */}
-                        {userRegion ? (
-                            <Box sx={{ mb: 2 }}>
-                                {/* 지역 정보 텍스트 삭제 */}
-                            </Box>
-                        ) : (
+                        {/* 빈 Box 제거 */}
+                        {!userRegion && (
                             <Alert severity="error" sx={{
                                 mb: 3,
                                 borderRadius: 2,
@@ -374,6 +364,45 @@ export default function HotelPredictPrice({
                             </Button>
                         </Zoom>
 
+                        {/* 초기화 버튼 - 결과가 있을 때만 표시 */}
+                        <Zoom in={showResults && !predicting} timeout={600}>
+                            <Button
+                                variant="outlined"
+                                onClick={() => {
+                                    setShowResults(false);
+                                    setAnimationStep(0);
+                                    setPredictionResults({ 1: null, 2: null, 3: null });
+                                }}
+                                fullWidth
+                                sx={{
+                                    mt: 2,
+                                    py: 1.5,
+                                    borderRadius: 3,
+                                    textTransform: 'none',
+                                    fontWeight: 600,
+                                    fontSize: '1rem',
+                                    letterSpacing: '0.3px',
+                                    borderColor: '#718096',
+                                    color: '#4a5568',
+                                    backgroundColor: 'white',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                                    transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                                    '&:hover': {
+                                        borderColor: '#4a5568',
+                                        backgroundColor: '#f7fafc',
+                                        transform: 'translateY(-2px)',
+                                        boxShadow: '0 4px 12px rgba(0,0,0,0.12)'
+                                    },
+                                    '&:active': {
+                                        transform: 'translateY(0)',
+                                        boxShadow: '0 2px 6px rgba(0,0,0,0.08)'
+                                    }
+                                }}
+                            >
+                                되돌아가기
+                            </Button>
+                        </Zoom>
+
                         {/* 예측 결과 출력 - 극적인 애니메이션 효과 적용 */}
                         <Fade in={showResults} timeout={1000}>
                             <Box sx={{
@@ -542,11 +571,52 @@ export default function HotelPredictPrice({
                     </CardContent>
                 </Card>
 
-                {/* 추가 정보 영역 (만약 제공되었다면) */}
                 {extraInfo && (
                     <Box>
                         {extraInfo}
                     </Box>
+                )}
+
+                {statsInfo && (
+                    <Card sx={{ mt: 2, backgroundColor: '#f8f9fa' }}>
+                        <CardContent>
+                            <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                                가격 통계 정보
+                            </Typography>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 2 }}>
+                                <Box>
+                                    <Typography variant="body2" color="text.secondary">평균</Typography>
+                                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                                        ₩{statsInfo.mean?.toLocaleString() || 'N/A'}
+                                    </Typography>
+                                </Box>
+                                <Box>
+                                    <Typography variant="body2" color="text.secondary">중앙값</Typography>
+                                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                                        ₩{statsInfo.median?.toLocaleString() || 'N/A'}
+                                    </Typography>
+                                </Box>
+                                <Box>
+                                    <Typography variant="body2" color="text.secondary">최저가</Typography>
+                                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#2f855a' }}>
+                                        ₩{statsInfo.min?.toLocaleString() || 'N/A'}
+                                    </Typography>
+                                </Box>
+                                <Box>
+                                    <Typography variant="body2" color="text.secondary">최고가</Typography>
+                                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#c53030' }}>
+                                        ₩{statsInfo.max?.toLocaleString() || 'N/A'}
+                                    </Typography>
+                                </Box>
+                                <Box>
+                                    <Typography variant="body2" color="text.secondary">데이터 수</Typography>
+                                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                                        {statsInfo.count || 0}개
+                                    </Typography>
+                                </Box>
+                            </Box>
+                        </CardContent>
+                    </Card>
                 )}
             </Box>
         </Box>

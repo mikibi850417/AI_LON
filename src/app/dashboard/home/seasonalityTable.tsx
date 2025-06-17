@@ -105,7 +105,8 @@ const generateDateRange = (days: number) => {
   });
 };
 
-// 스타일 정의
+/*
+// 스타일 정의 - 현재 사용되지 않음
 const tableStyles = {
   container: {
     maxHeight: 440,
@@ -123,6 +124,7 @@ const tableStyles = {
     fontSize: '0.875rem',
   },
 };
+*/
 
 // 여행지수 컴포넌트
 const SeasonalityTable = ({ userRegion, days = 14 }: SeasonalityTableProps) => {
@@ -360,9 +362,7 @@ const SeasonalityTable = ({ userRegion, days = 14 }: SeasonalityTableProps) => {
                   <CartesianGrid strokeDasharray="3 3" stroke={alpha('#000', 0.1)} />
                   <XAxis
                     dataKey="date"
-                    tick={{ fill: '#666' }}
-                    tickFormatter={(value, index) => {
-                      const isWeekend = chartData[index]?.isWeekend;
+                    tick={{ fill: '#666' }} tickFormatter={(value, index) => {
                       return `${value}(${chartData[index]?.dayOfWeek})`;
                     }}
                   />

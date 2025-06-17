@@ -5,6 +5,12 @@ import { Box, TextField, Button, Chip, Typography, Autocomplete } from "@mui/mat
 import { GoogleMap, useLoadScript } from "@react-google-maps/api";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import AutorenewIcon from '@mui/icons-material/Autorenew';
+import { Card, CardContent } from "@mui/material";
+import Image from "next/image";
 
 const mapContainerStyle = { width: "100%", height: "500px" };
 const defaultCenter = { lat: 37.5665, lng: 126.9780 };
@@ -20,10 +26,27 @@ const getApiBaseUrl = (): string => {
 };
 
 // Daum 우편번호 타입 정의 추가
+// FastAPI 스타일 타입 정의
+interface PostcodeOptions {
+  oncomplete?: (data: PostcodeResult) => void;
+  onclose?: () => void;
+  width?: string | number;
+  height?: string | number;
+}
+
+interface PostcodeResult {
+  address: string;
+  zonecode: string;
+  roadAddress?: string;
+  jibunAddress?: string;
+}
+
 declare global {
   interface Window {
     daum: {
-      Postcode: new (options: any) => any;
+      Postcode: new (options: PostcodeOptions) => {
+        open: () => void;
+      };
     };
   }
 }
@@ -33,8 +56,8 @@ export default function OnboardingPage() {
 
   // 사용자 정보 상태 (ID, 이메일, provider)
   const [userId, setUserId] = useState<string>("");
-  const [userEmail, setUserEmail] = useState<string>("");
-  const [userProvider, setUserProvider] = useState<string>("");
+  const [, setUserEmail] = useState<string>("");
+  const [, setUserProvider] = useState<string>("");
 
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [marker, setMarker] = useState<google.maps.Marker | null>(null);
@@ -53,9 +76,12 @@ export default function OnboardingPage() {
   const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
 
   // 원본 데이터 상태 (변경 여부 비교용)
-  const [originalHotelAddress, setOriginalHotelAddress] = useState("");
-  const [originalHotelName, setOriginalHotelName] = useState("");
-  const [originalCompetitorHotels, setOriginalCompetitorHotels] = useState<string[]>([]);
+  const [, setOriginalHotelAddress] = useState("");
+  const [, setOriginalHotelName] = useState("");
+  const [, setOriginalCompetitorHotels] = useState<string[]>([]);
+
+  // 새로운 상태 추가
+  const [showWelcomeScreen, setShowWelcomeScreen] = useState(false);
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
@@ -183,8 +209,8 @@ export default function OnboardingPage() {
   const openDaumPostcode = () => {
     if (window.daum && window.daum.Postcode) {
       new window.daum.Postcode({
-        oncomplete: function (data: any) {
-          const roadAddress = data.roadAddress;
+        oncomplete: function (data: PostcodeResult) {
+          const roadAddress = data.roadAddress || data.address;
           setHotelAddress(roadAddress);
           if (map) {
             const geocoder = new google.maps.Geocoder();
@@ -414,9 +440,9 @@ export default function OnboardingPage() {
           console.error("주소 처리 API 오류:", response.status, errorText);
           throw new Error(`API 요청 실패: ${response.status} ${errorText}`);
         }
-      } catch (apiError: any) {
+      } catch (apiError: unknown) {
         console.error("주소 처리 API 호출 실패:", apiError);
-        throw new Error(`주소 처리 API 호출 실패: ${apiError.message || '알 수 없는 오류'}`);
+        throw new Error(`주소 처리 API 호출 실패: ${apiError instanceof Error ? apiError.message : '알 수 없는 오류'}`);
       }
 
       // 주소 정보 업데이트
@@ -469,9 +495,9 @@ export default function OnboardingPage() {
       setError("내 호텔 정보가 성공적으로 저장되었습니다.");
       setTimeout(() => setError(""), 3000);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("내 호텔 정보 저장 오류:", error);
-      setError(error.message || "처리 중 오류가 발생했습니다.");
+      setError(error instanceof Error ? error.message : "처리 중 오류가 발생했습니다.");
       setTimeout(() => setError(""), 3000);
     }
   };
@@ -544,9 +570,9 @@ export default function OnboardingPage() {
           setTimeout(() => setError(""), 3000);
           return;
         }
-      } catch (apiError: any) {
+      } catch (apiError: unknown) {
         console.error("경쟁 호텔 API 호출 실패:", apiError);
-        setError("경쟁 호텔 API 호출 실패: " + (apiError.message || "알 수 없는 오류"));
+        setError("경쟁 호텔 API 호출 실패: " + (apiError instanceof Error ? apiError.message : "알 수 없는 오류"));
         setTimeout(() => setError(""), 3000);
         return;
       }
@@ -554,22 +580,213 @@ export default function OnboardingPage() {
       // 원본 데이터 업데이트
       setOriginalCompetitorHotels([...selectedCompetitorHotels]);
 
-      // 성공 메시지 표시
-      setError("경쟁 호텔 정보가 성공적으로 저장되었습니다.");
-      setTimeout(() => setError(""), 3000);
+      // 성공 후 환영 화면 표시
+      setShowWelcomeScreen(true);
 
-      // 대시보드로 이동
-      router.push("/dashboard");
-
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("경쟁 호텔 정보 저장 오류:", error);
-      setError("처리 중 오류가 발생했습니다: " + (error.message || "알 수 없는 오류"));
+      setError("처리 중 오류가 발생했습니다: " + (error instanceof Error ? error.message : "알 수 없는 오류"));
       setTimeout(() => setError(""), 3000);
     }
   };
 
+  // 대시보드로 이동하는 함수
+  const goToDashboard = () => {
+    console.log("대시보드로 이동 시도");
+    window.location.href = "/dashboard";
+  };
+
   if (loadError) return <p>🚨 지도 로드 실패</p>;
   if (!isLoaded) return <p>📍 지도를 불러오는 중...</p>;
+
+  // 환영 화면 렌더링
+  if (showWelcomeScreen) {
+    return (
+      <Box sx={{
+        minHeight: '100vh',
+        background: '#f5f7ff',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        p: 4
+      }}>
+        <Card sx={{
+          maxWidth: '700px',
+          width: '100%',
+          borderRadius: '16px',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
+          border: '1px solid rgba(226, 232, 240, 0.8)',
+          overflow: 'hidden'
+        }}>
+          <CardContent sx={{ p: 6, textAlign: 'center' }}>
+            {/* 로고 섹션 */}
+            <Box sx={{ mb: 4 }}>
+              <Image
+                src="/intelligentlon.png"
+                alt="Intelligent LON 로고"
+                width={200}
+                height={67}
+                style={{ 
+                  margin: '0 auto',
+                  objectFit: 'contain'
+                }}
+              />
+            </Box>
+            
+            {/* 성공 아이콘과 제목 */}
+            <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+              <CheckCircleIcon sx={{ color: '#10b981', fontSize: '2.5rem' }} />
+              <Typography variant="h4" sx={{
+                fontWeight: 'bold',
+                color: '#2c3e50',
+                fontSize: { xs: '1.5rem', sm: '2rem' }
+              }}>
+                설정이 완료되었습니다!
+              </Typography>
+            </Box>
+            
+            <Typography variant="h6" sx={{
+              color: '#64748b',
+              mb: 4,
+              lineHeight: 1.6,
+              fontSize: { xs: '1rem', sm: '1.25rem' }
+            }}>
+              L.O.N이 경쟁 호텔 데이터를 수집하고 분석을 시작합니다
+            </Typography>
+
+            {/* 기능 카드들 */}
+            <Box sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' },
+              gap: 2,
+              mb: 4
+            }}>
+              <Card sx={{
+                backgroundColor: '#f0f9ff',
+                border: '1px solid #0ea5e9',
+                borderRadius: '12px',
+                p: 2
+              }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                  <AutorenewIcon sx={{ color: '#0ea5e9', fontSize: '2rem' }} />
+                  <CheckCircleIcon sx={{ color: '#10b981', fontSize: '1.5rem' }} />
+                  <Typography variant="body2" sx={{ 
+                    color: '#0ea5e9', 
+                    fontWeight: 500, 
+                    textAlign: 'center' 
+                  }}>
+                    실시간 가격 모니터링
+                  </Typography>
+                </Box>
+              </Card>
+              
+              <Card sx={{
+                backgroundColor: '#faf5ff',
+                border: '1px solid #8b5cf6',
+                borderRadius: '12px',
+                p: 2
+              }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                  <TrendingUpIcon sx={{ color: '#8b5cf6', fontSize: '2rem' }} />
+                  <CheckCircleIcon sx={{ color: '#10b981', fontSize: '1.5rem' }} />
+                  <Typography variant="body2" sx={{ 
+                    color: '#8b5cf6', 
+                    fontWeight: 500, 
+                    textAlign: 'center' 
+                  }}>
+                    시장 동향 분석
+                  </Typography>
+                </Box>
+              </Card>
+              
+              <Card sx={{
+                backgroundColor: '#f0fdf4',
+                border: '1px solid #10b981',
+                borderRadius: '12px',
+                p: 2
+              }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                  <SmartToyIcon sx={{ color: '#10b981', fontSize: '2rem' }} />
+                  <CheckCircleIcon sx={{ color: '#10b981', fontSize: '1.5rem' }} />
+                  <Typography variant="body2" sx={{ 
+                    color: '#10b981', 
+                    fontWeight: 500, 
+                    textAlign: 'center' 
+                  }}>
+                    AI 가격 최적화
+                  </Typography>
+                </Box>
+              </Card>
+            </Box>
+            
+            {/* 정보 텍스트 */}
+            <Box sx={{
+              backgroundColor: '#fff7ed',
+              border: '1px solid #fed7aa',
+              borderRadius: '12px',
+              p: 3,
+              mb: 4
+            }}>
+              <Typography variant="body1" sx={{
+                color: '#ea580c',
+                mb: 2,
+                fontWeight: 600
+              }}>
+                ⏳ 데이터 수집 및 분석 진행 중
+              </Typography>
+              <Typography variant="body2" sx={{
+                color: '#9a3412',
+                mb: 2,
+                lineHeight: 1.6
+              }}>
+                경쟁 호텔의 가격 정보를 수집하고 AI 분석 모델을 준비하고 있습니다.
+                <br />
+                <strong>5분에서 최대 15분</strong>까지 소요되며, 완료 전까지는 대시보드에 일부 데이터가 표시되지 않을 수 있습니다.
+              </Typography>
+              <Typography variant="body2" sx={{
+                color: '#1e40af',
+                mb: 1,
+                fontWeight: 500
+              }}>
+                🙏 고객님께 양해 말씀드립니다
+              </Typography>
+              <Typography variant="body2" sx={{
+                color: '#3730a3',
+                lineHeight: 1.5
+              }}>
+                정확하고 신뢰할 수 있는 분석을 위해 초기 설정 시간이 필요합니다.
+                <br />
+                잠시만 기다려 주시면 완성된 대시보드를 이용하실 수 있습니다.
+              </Typography>
+            </Box>
+            
+            {/* 대시보드로 이동 버튼 */}
+            <Button
+              variant="contained"
+              onClick={goToDashboard}
+              sx={{
+                backgroundColor: '#2c3e50',
+                '&:hover': {
+                  backgroundColor: '#34495e',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 4px 14px rgba(44, 62, 80, 0.3)'
+                },
+                borderRadius: '12px',
+                px: 6,
+                py: 2,
+                fontSize: '1.1rem',
+                fontWeight: 600,
+                textTransform: 'none',
+                transition: 'all 0.3s ease'
+              }}
+            >
+              대시보드 이동
+            </Button>
+          </CardContent>
+        </Card>
+      </Box>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 text-black p-4">

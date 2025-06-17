@@ -1,31 +1,93 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
 export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
+    const isDevelopment = process.env.NODE_ENV === 'development';
 
-    console.log('Middleware triggered for path:', pathname);
+    if (isDevelopment) {
+        console.log('Middleware triggered for path:', pathname);
+    }
 
     // /dashboard 경로에 접근하는 경우
     if (pathname.startsWith('/dashboard')) {
-        const response = NextResponse.next();
-        const supabase = createMiddlewareClient({ req: request, res: response });
+        let response = NextResponse.next({
+            request: {
+                headers: request.headers,
+            },
+        });
 
-        // 쿠키 디버깅 로그 추가
-        const cookies = request.headers.get('cookie');
-        console.log('Request cookies:', cookies);
+        const supabase = createServerClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+                cookies: {
+                    get(name: string) {
+                        const cookie = request.cookies.get(name);
+                        // 개발 환경에서만 로깅하고, 인증 토큰 쿠키는 값이 있을 때만 로깅
+                        if (isDevelopment && cookie?.value && !name.includes('auth-token')) {
+                            console.log(`Getting cookie ${name}:`, cookie.value);
+                        }
+                        return cookie?.value;
+                    },
+                    set(name: string, value: string, options: CookieOptions) {
+                        if (isDevelopment && !name.includes('auth-token')) {
+                            console.log(`Setting cookie ${name}`);
+                        }
+                        request.cookies.set({
+                            name,
+                            value,
+                            ...options,
+                        });
+                        response = NextResponse.next({
+                            request: {
+                                headers: request.headers,
+                            },
+                        });
+                        response.cookies.set({
+                            name,
+                            value,
+                            ...options,
+                        });
+                    },
+                    remove(name: string, options: CookieOptions) {
+                        if (isDevelopment && !name.includes('auth-token')) {
+                            console.log(`Removing cookie ${name}`);
+                        }
+                        request.cookies.set({
+                            name,
+                            value: '',
+                            ...options,
+                        });
+                        response = NextResponse.next({
+                            request: {
+                                headers: request.headers,
+                            },
+                        });
+                        response.cookies.set({
+                            name,
+                            value: '',
+                            ...options,
+                        });
+                    },
+                },
+            }
+        );
 
-        // Supabase 세션 디버깅 로그 추가
         try {
             const {
                 data: { session },
             } = await supabase.auth.getSession();
 
-            console.log('Supabase session:', session);
+            if (isDevelopment && session) {
+                console.log('User authenticated successfully');
+            }
 
             if (!session?.user) {
-                console.log('No user session found, redirecting to /auth/login');
+                if (isDevelopment) {
+                    console.log('No user session found, redirecting to /auth/login');
+                }
                 const url = request.nextUrl.clone();
                 url.pathname = '/auth/login';
                 return NextResponse.redirect(url);
@@ -37,18 +99,20 @@ export async function middleware(request: NextRequest) {
                 .eq('id', session.user.id)
                 .single();
 
-            console.log('User data:', userData, 'Error:', error);
-
             if (error || !userData?.is_subscribed) {
-                console.log('User is not subscribed, redirecting to /auth/login');
+                if (isDevelopment) {
+                    console.log('User is not subscribed, redirecting to /auth/login');
+                }
                 const url = request.nextUrl.clone();
                 url.pathname = '/auth/login';
                 return NextResponse.redirect(url);
             }
 
-            console.log('User is subscribed, allowing access to /dashboard');
+            return response;
         } catch (err) {
-            console.error('Error during middleware execution:', err);
+            if (isDevelopment) {
+                console.error('Error during middleware execution:', err);
+            }
             const url = request.nextUrl.clone();
             url.pathname = '/auth/login';
             return NextResponse.redirect(url);

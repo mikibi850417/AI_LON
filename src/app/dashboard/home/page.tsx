@@ -1,7 +1,7 @@
 // src/app/dashboard/home/page.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import HotelPriceTable from "./HotelPriceTable";
 import HotelPriceChart from "./HotelPriceChart";
 // 기존 HotelPredictPrice 대신 공통 컴포넌트 사용
@@ -17,14 +17,21 @@ import Image from "next/image";
 
 const getApiBaseUrl = (): string => process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
+interface HotelPriceData {
+  hotel_name: string;
+  date: string;
+  min_price: string | number;
+}
+
 export default function DashboardPage() {
   const [userId, setUserId] = useState<string>("");
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<HotelPriceData[]>([]);
   const [loading, setLoading] = useState(false);
   const [days, setDays] = useState(7);
   const [dates, setDates] = useState<string[]>([]);
   const [userRegion, setUserRegion] = useState<{ location_code: string; region: string } | null>(null);
   const [openPredictDialog, setOpenPredictDialog] = useState(false);
+  const [myHotelName, setMyHotelName] = useState<string>("");
 
   useEffect(() => {
     const fetchSession = async () => {
@@ -33,6 +40,7 @@ export default function DashboardPage() {
         setUserId(session.user.id);
         // 사용자 ID가 있으면 region 정보도 가져옵니다
         fetchUserRegion(session.user.id);
+        fetchMyHotelName(session.user.id);
       }
     };
     fetchSession();
@@ -61,12 +69,34 @@ export default function DashboardPage() {
     }
   };
 
+  // 내 호텔 이름을 가져오는 함수 추가
+  const fetchMyHotelName = async (uid: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('hotel_name')
+        .eq('id', uid)
+        .single();
+
+      if (error) {
+        console.error('내 호텔 이름 조회 오류:', error);
+        return;
+      }
+
+      if (data?.hotel_name) {
+        setMyHotelName(data.hotel_name);
+      }
+    } catch (err) {
+      console.error('내 호텔 이름 조회 중 예외 발생:', err);
+    }
+  };
+
   const getDateRange = (numDays: number) => {
     const today = new Date();
     return Array.from({ length: numDays }, (_, i) => format(addDays(today, i), "yyyy-MM-dd"));
   };
 
-  const fetchPriceData = async () => {
+  const fetchPriceData = useCallback(async () => {
     if (!userId) return;
     setLoading(true);
     const startDate = format(new Date(), "yyyy-MM-dd");
@@ -83,17 +113,17 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId, days]);
 
   useEffect(() => {
     if (userId) fetchPriceData();
-  }, [userId, days]);
+  }, [userId, fetchPriceData]);
 
   // 특정 날짜에 대한 최저가 가져오는 함수
   const getPricesForDate = (date: string): number[] => {
     return data
       .filter((item) => item.date === date)
-      .map((item) => parseFloat(item.min_price))
+      .map((item) => typeof item.min_price === 'string' ? parseFloat(item.min_price) : item.min_price)
       .sort((a, b) => a - b);
   };
 
@@ -163,8 +193,8 @@ export default function DashboardPage() {
 
       {!loading && (
         <>
-          <HotelPriceTable data={data} dates={dates} />
-          <HotelPriceChart data={data} dates={dates} />
+          <HotelPriceTable data={data} dates={dates} myHotelName={myHotelName} />
+          <HotelPriceChart data={data} dates={dates} myHotelName={myHotelName} />
 
           <TrendsTable days={days} dates={dates} />
           <Box mt={3}>

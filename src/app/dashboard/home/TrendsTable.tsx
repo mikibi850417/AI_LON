@@ -24,8 +24,19 @@ import { alpha } from "@mui/material/styles";
 import HotelIcon from '@mui/icons-material/Hotel';
 import FlightIcon from '@mui/icons-material/Flight';
 
+// FastAPI 응답 타입 정의
+interface PCAItem {
+  index?: string;
+  Label?: string;
+}
+
+interface APIResponse {
+  df_pca?: PCAItem[];
+}
+
 interface Props {
   days: number;
+  dates?: string[]; // FastAPI의 선택적 파라미터 패턴을 따름
 }
 
 const getApiBaseUrl = (): string =>
@@ -71,10 +82,10 @@ const getTrendIcon = (label: string | null) => {
   }
 };
 
-export default function TrendsTable({ days }: Props) {
+export default function TrendsTable({ days, dates: propDates }: Props) {
   const [labelsHotel, setLabelsHotel] = useState<Record<string, string>>({});
   const [labelsFlight, setLabelsFlight] = useState<Record<string, string>>({});
-  const [dates, setDates] = useState<string[]>([]);
+  const [dates, setDates] = useState<string[]>(propDates || []);
   // 마지막 업데이트 시간 (클라이언트 전용)
   const [updateTime, setUpdateTime] = useState<string>("");
 
@@ -96,15 +107,15 @@ export default function TrendsTable({ days }: Props) {
           `${getApiBaseUrl()}/api/${endpoint}?start_date=${start}&end_date=${endFetch}&return_df_pca=true&return_df_segments=false`
         );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const result = await res.json();
+        const result: APIResponse = await res.json();
         const map: Record<string, string> = {};
-        result.df_pca?.forEach((item: any) => {
+        result.df_pca?.forEach((item: PCAItem) => {
           const date = item.index?.slice(0, 10);
           if (date && item.Label) map[date] = item.Label;
         });
         setter(map);
-      } catch (e) {
-        console.error(`${endpoint} PCA 로드 실패`, e);
+      } catch (e: unknown) {
+        console.error(`${endpoint} PCA 로드 실패`, e instanceof Error ? e.message : e);
       }
     };
 
@@ -165,7 +176,7 @@ export default function TrendsTable({ days }: Props) {
             </TableRow>
           </TableHead>
           <TableBody>
-            {['Hotel Trend', 'Flight Trend'].map((label, idx) => (
+            {['Hotel Trend', 'Flight Trend'].map((label) => (
               <TableRow key={label} sx={{ '&:hover': { backgroundColor: alpha('#2c3e50', 0.04), transition: 'background-color 0.2s ease' } }}>
                 <TableCell sx={{ ...headerCellStyle, padding: '14px 24px', borderLeft: '4px solid #2c3e50', backgroundColor: alpha('#2c3e50', 0.03) }}>
                   {label}

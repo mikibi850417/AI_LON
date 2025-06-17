@@ -3,15 +3,25 @@ import { Box, Typography } from "@mui/material";
 import { DataGrid, GridRenderCellParams } from "@mui/x-data-grid";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 
+// 피벗 테이블 행 타입 정의 (FastAPI 스타일)
+interface PivotTableRow {
+    hotel_name: string;
+    hotelName?: string;
+    id?: string;
+    [date: string]: string | number | null | undefined;
+}
+
+interface PivotTableDataGridProps {
+    pivotTableRows: PivotTableRow[];
+    pivotTableDates: string[];
+    favoriteHotels?: string[];
+}
+
 export default function PivotTableDataGrid({
     pivotTableRows,
     pivotTableDates,
     favoriteHotels = [] // 기본값으로 빈 배열
-}: {
-    pivotTableRows: any[];
-    pivotTableDates: string[];
-    favoriteHotels?: string[];
-}) {
+}: PivotTableDataGridProps) {
     // 전체 너비 계산: 호텔명 열(150px) + 날짜 열들(각 120px)
     const totalWidth = 150 + pivotTableDates.length * 120;
 

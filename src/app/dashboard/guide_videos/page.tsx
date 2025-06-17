@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { Box } from "@mui/material";
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
+import Image from 'next/image';
 
 interface VideoData {
   id: string;
   title: string;
   description: string;
+  thumbnail: string;
 }
 
 export default function GuideVideosPage() {
@@ -15,17 +17,20 @@ export default function GuideVideosPage() {
     {
       id: "FHUEOLGhRrw",
       title: "소개 영상",
-      description: "Intelligent L.O.N 회사를 소개합니다."
+      description: "Intelligent L.O.N 회사를 소개합니다.",
+      thumbnail: "https://img.youtube.com/vi/FHUEOLGhRrw/mqdefault.jpg"
     },
     {
       id: "fe3hNqUWDyE",
       title: "웹가이드 영상",
-      description: "웹사이트 사용 방법에 대한 상세한 가이드입니다."
+      description: "웹사이트 사용 방법에 대한 상세한 가이드입니다.",
+      thumbnail: "https://img.youtube.com/vi/fe3hNqUWDyE/mqdefault.jpg"
     },
     {
       id: "MfZd0KZZXMU",
       title: "데이터 활용 가이드 영상",
-      description: "데이터를 효과적으로 활용하는 방법을 안내합니다."
+      description: "데이터를 효과적으로 활용하는 방법을 안내합니다.",
+      thumbnail: "https://img.youtube.com/vi/MfZd0KZZXMU/mqdefault.jpg"
     }
   ];
 
@@ -102,10 +107,12 @@ export default function GuideVideosPage() {
                   >
                     <div className="flex items-center space-x-4">
                       <div className="w-24 h-16 bg-gray-800 rounded-lg overflow-hidden flex-shrink-0">
-                        <img
-                          src={`https://img.youtube.com/vi/${video.id}/mqdefault.jpg`}
+                        <Image
+                          src={video.thumbnail}
                           alt={video.title}
-                          className="w-full h-full object-cover"
+                          width={320}
+                          height={180}
+                          style={{ width: '100%', height: 'auto' }}
                         />
                       </div>
                       <div>

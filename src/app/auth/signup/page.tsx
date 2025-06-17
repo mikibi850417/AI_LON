@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import Image from "next/image";
 import { Box, TextField, Button, Typography, CircularProgress, Divider, Paper } from "@mui/material";
@@ -10,7 +9,6 @@ import LockIcon from "@mui/icons-material/Lock";
 import Link from 'next/link';
 
 const SignupPage = () => {
-  const router = useRouter();
   // 환경 변수에서 authPath를 불러오며, 기본값은 "/auth"
   const authPath = process.env.NEXT_PUBLIC_AUTH_PATH || "/auth";
 
@@ -152,17 +150,17 @@ const SignupPage = () => {
             alt="Company Logo"
             width={200}
             height={70}
-            style={{ 
-              objectFit: 'contain', 
-              marginBottom: '16px', 
-              position: 'relative', 
+            style={{
+              objectFit: 'contain',
+              marginBottom: '16px',
+              position: 'relative',
               zIndex: 1,
               filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))'
             }}
           />
-          <Typography variant="h5" sx={{ 
-            color: 'white', 
-            fontWeight: 'bold', 
+          <Typography variant="h5" sx={{
+            color: 'white',
+            fontWeight: 'bold',
             textShadow: '0 2px 4px rgba(0,0,0,0.3)',
             position: 'relative',
             zIndex: 1
@@ -323,13 +321,13 @@ const SignupPage = () => {
             </Button>
           </form>
 
-          <Divider sx={{ 
+          <Divider sx={{
             my: 3,
             '&::before, &::after': {
               borderColor: 'rgba(44, 62, 80, 0.2)'
             }
           }}>
-            <Typography variant="body2" sx={{ 
+            <Typography variant="body2" sx={{
               color: '#64748b',
               px: 1,
               py: 0.5,

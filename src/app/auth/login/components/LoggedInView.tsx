@@ -45,6 +45,11 @@ export const LoggedInView = ({ userInfo, authPath, handleGoDashboard, handleLogo
         })
         : null;
 
+    // 구독 상태 새로고침 함수
+    const refreshSubscriptionStatus = () => {
+        window.location.reload();
+    };
+
     return (
         <Box sx={{
             display: 'flex',
@@ -129,33 +134,52 @@ export const LoggedInView = ({ userInfo, authPath, handleGoDashboard, handleLogo
                         backgroundColor: isSubscribed ? 'rgba(46, 204, 113, 0.05)' : 'rgba(231, 76, 60, 0.05)',
                         borderRadius: '12px',
                         border: `1px solid ${isSubscribed ? 'rgba(46, 204, 113, 0.2)' : 'rgba(231, 76, 60, 0.2)'}`,
+                        position: 'relative'
                     }}>
-                        <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 'bold' }}>
-                            구독 상태
-                        </Typography>
-                        <Typography variant="body1" sx={{
-                            fontWeight: 'medium',
-                            color: isSubscribed ? '#27ae60' : '#e74c3c',
-                            fontSize: '1.1rem'
-                        }}>
-                            {isSubscribed ? (
-                                daysUntilExpiration <= 7 ? '구독 만료 임박' : '구독 중'
-                            ) : (
-                                userInfo.is_subscribed && subscriptionEndDate && subscriptionEndDate <= now
-                                    ? '구독 만료됨'
-                                    : '구독하지 않음'
-                            )}
-                        </Typography>
-                        {subscriptionEndDate && (
-                            <Typography variant="caption" sx={{
-                                display: 'block',
-                                color: daysUntilExpiration <= 7 ? '#e67e22' : '#64748b',
-                                mt: 1,
-                                fontWeight: daysUntilExpiration <= 7 ? 'bold' : 'normal'
-                            }}>
-                                {subscriptionEndDate <= now ? '만료일: ' : '구독 만료일: '}{formattedEndDate}
-                            </Typography>
-                        )}
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <Box sx={{ flex: 1 }}>
+                                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 'bold' }}>
+                                    구독 상태
+                                </Typography>
+                                <Typography variant="body1" sx={{
+                                    fontWeight: 'medium',
+                                    color: isSubscribed ? '#27ae60' : '#e74c3c',
+                                    fontSize: '1.1rem'
+                                }}>
+                                    {isSubscribed ? (
+                                        daysUntilExpiration <= 7 ? '구독 만료 임박' : '구독 중'
+                                    ) : (
+                                        userInfo.is_subscribed && subscriptionEndDate && subscriptionEndDate <= now
+                                            ? '구독 만료됨'
+                                            : '구독하지 않음'
+                                    )}
+                                </Typography>
+                                {subscriptionEndDate && (
+                                    <Typography variant="caption" sx={{
+                                        display: 'block',
+                                        color: daysUntilExpiration <= 7 ? '#e67e22' : '#64748b',
+                                        mt: 1,
+                                        fontWeight: daysUntilExpiration <= 7 ? 'bold' : 'normal'
+                                    }}>
+                                        {subscriptionEndDate <= now ? '만료일: ' : '구독 만료일: '}{formattedEndDate}
+                                    </Typography>
+                                )}
+                            </Box>
+                            <Button
+                                size="small"
+                                onClick={refreshSubscriptionStatus}
+                                sx={{
+                                    minWidth: 'auto',
+                                    p: 1,
+                                    color: '#64748b',
+                                    '&:hover': {
+                                        backgroundColor: 'rgba(100, 116, 139, 0.1)'
+                                    }
+                                }}
+                            >
+                                🔄
+                            </Button>
+                        </Box>
                     </Box>
 
                     {isSubscribed ? (
@@ -164,7 +188,26 @@ export const LoggedInView = ({ userInfo, authPath, handleGoDashboard, handleLogo
                                 fullWidth
                                 variant="contained"
                                 startIcon={<DashboardIcon />}
-                                onClick={handleGoDashboard}
+                                onClick={() => {
+                                    console.log("서비스 시작하기 버튼 클릭됨");
+
+                                    // 쿠키 정보 출력
+                                    const cookies = document.cookie;
+                                    console.log("Request cookies:", cookies);
+
+                                    // 개별 쿠키 확인
+                                    const cookiesArray = cookies.split(';').map(cookie => cookie.trim());
+                                    console.log("Cookies array:", cookiesArray);
+
+                                    // Supabase 관련 쿠키 필터링
+                                    const supabaseCookies = cookiesArray.filter(cookie =>
+                                        cookie.includes('sb-') ||
+                                        cookie.includes('supabase')
+                                    );
+                                    console.log("Supabase cookies:", supabaseCookies);
+
+                                    handleGoDashboard();
+                                }}
                                 sx={{
                                     mb: 2,
                                     py: 1.5,
@@ -180,7 +223,7 @@ export const LoggedInView = ({ userInfo, authPath, handleGoDashboard, handleLogo
                                     transition: 'all 0.3s ease'
                                 }}
                             >
-                                대시보드 이동
+                                서비스 시작하기
                             </Button>
                             {daysUntilExpiration <= 7 && daysUntilExpiration > 0 && (
                                 <Button

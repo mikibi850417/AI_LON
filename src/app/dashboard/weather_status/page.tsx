@@ -79,12 +79,28 @@ const getDisplayDate = (dateString: string) => {
   return dateString;
 };
 
+interface WeatherDataItem {
+  date: string;
+  location_name: string;
+  min_temp: number;
+  max_temp: number;
+  precipitation: number;
+  weather_condition: string;
+  weather_code: number;
+}
+
+interface TemperatureTrend {
+  date: string;
+  min_avg: number;
+  max_avg: number;
+}
+
 const WeatherStatusPage = () => {
-  const [weatherData, setWeatherData] = useState<any[]>([]);
-  const [temperatureTrends, setTemperatureTrends] = useState<any[]>([]);
-  const [structuredWeather, setStructuredWeather] = useState<{ [location: string]: { [date: string]: any } }>({});
+  // const [weatherData, setWeatherData] = useState<WeatherDataItem[]>([]);
+  const [temperatureTrends, setTemperatureTrends] = useState<TemperatureTrend[]>([]);
+  const [structuredWeather, setStructuredWeather] = useState<{ [location: string]: { [date: string]: WeatherDataItem } }>({});
   const [selectedLocation, setSelectedLocation] = useState<string>("");
-  const [viewMode, setViewMode] = useState<"table">("table");
+  // const [viewMode, setViewMode] = useState<"table">("table");
   const [maxAvailableDays, setMaxAvailableDays] = useState<number>(30);
   const [selectedWeek, setSelectedWeek] = useState<number>(0);
   const [selectedGraphWeek, setSelectedGraphWeek] = useState<number>(0);
@@ -94,16 +110,16 @@ const WeatherStatusPage = () => {
     fetch(API_URL)
       .then((res) => res.json())
       .then((data) => {
-        setWeatherData(data);
+        // setWeatherData(data);
 
         // 📊 날짜별 평균 기온 계산
         const dateMap: { [key: string]: { date: string; min_avg: number; max_avg: number } } = {};
-        const structuredData: { [location: string]: { [date: string]: any } } = {};
+        const structuredData: { [location: string]: { [date: string]: WeatherDataItem } } = {};
 
         // 실제로 받아온 날짜 수 계산
         const uniqueDates = new Set<string>();
 
-        data.forEach((entry: any) => {
+        data.forEach((entry: WeatherDataItem) => {
           uniqueDates.add(entry.date);
 
           // ✅ 날짜별 평균 온도 데이터 정리
@@ -129,33 +145,33 @@ const WeatherStatusPage = () => {
       .catch((err) => console.error("Error fetching weather data:", err));
   }, []);
 
-  // 요일별로 날짜 데이터 정리하는 함수
-  const organizeDataByWeekday = () => {
-    // 요일 순서: 일, 월, 화, 수, 목, 금, 토
-    const weekdayOrder = ["일", "월", "화", "수", "목", "금", "토"];
-    const result: { [weekday: string]: { dates: string[], data: any[] } } = {};
+  // 요일별로 날짜 데이터 정리하는 함수 (현재 사용되지 않음)
+  // const organizeDataByWeekday = useCallback(() => {
+  //   // 요일 순서: 일, 월, 화, 수, 목, 금, 토
+  //   const weekdayOrder = ["일", "월", "화", "수", "목", "금", "토"];
+  //   const result: { [weekday: string]: { dates: string[], data: WeatherDataItem[] } } = {};
 
-    // 요일별 객체 초기화
-    weekdayOrder.forEach(day => {
-      result[day] = { dates: [], data: [] };
-    });
+  //   // 요일별 객체 초기화
+  //   weekdayOrder.forEach(day => {
+  //     result[day] = { dates: [], data: [] };
+  //   });
 
-    // 날짜 정렬
-    const allDates = Object.keys(structuredWeather)
-      .flatMap(location => Object.keys(structuredWeather[location]))
-      .filter((value, index, self) => self.indexOf(value) === index)
-      .sort();
+  //   // 날짜 정렬
+  //   const allDates = Object.keys(structuredWeather)
+  //     .flatMap(location => Object.keys(structuredWeather[location]))
+  //     .filter((value, index, self) => self.indexOf(value) === index)
+  //     .sort();
 
-    // 각 날짜를 해당 요일에 배치
-    allDates.forEach((date: string) => {
-      const weekday = getDayOfWeek(date);
-      if (result[weekday]) {
-        result[weekday].dates.push(date);
-      }
-    });
+  //   // 각 날짜를 해당 요일에 배치
+  //   allDates.forEach((date: string) => {
+  //     const weekday = getDayOfWeek(date);
+  //     if (result[weekday]) {
+  //       result[weekday].dates.push(date);
+  //     }
+  //   });
 
-    return result;
-  };
+  //   return result;
+  // }, [structuredWeather]);
 
   // 📌 정렬된 날짜 목록 (테이블 헤더용)
   const sortedDates = useMemo(() => {
@@ -193,9 +209,9 @@ const WeatherStatusPage = () => {
   };
 
   // 요일별로 정리된 데이터
-  const weekdayData = useMemo(() => {
-    return organizeDataByWeekday();
-  }, [structuredWeather]);
+  // const weekdayData = useMemo(() => {
+  //   return organizeDataByWeekday();
+  // }, [organizeDataByWeekday]);
 
   // 선택된 지역과 기간에 따른 온도 데이터 계산
   const filteredTemperatureTrends = useMemo(() => {
@@ -517,7 +533,7 @@ const WeatherStatusPage = () => {
                     border: 'none',
                     padding: '10px'
                   }}
-                  formatter={(value: any) => [`${typeof value === 'number' ? Math.round(value) : value}°C`, '']}
+                  formatter={(value: unknown) => [`${typeof value === 'number' ? Math.round(value) : value}°C`, '']}
                   labelFormatter={(label) => `${label} 날짜`}
                 />
                 <Legend
@@ -769,14 +785,14 @@ const WeatherStatusPage = () => {
                                 align="center"
                                 sx={{
                                   fontSize: "0.85rem",
-                                  bgcolor: weatherForDate ? getWeatherColor(weatherForDate.weather_code) : "transparent",
+                                  bgcolor: weatherForDate ? getWeatherColor(Number(weatherForDate.weather_code) || 0) : "transparent",
                                   p: 1
                                 }}
                               >
                                 {weatherForDate ? (
                                   <>
                                     <Box sx={{ fontSize: "1.2rem", mb: 0.5 }}>
-                                      {weatherIcons[weatherForDate.weather_code] || "❓"}
+                                      {weatherIcons[Number(weatherForDate.weather_code) || 0] || "❓"}
                                     </Box>
                                     <Box sx={{ display: "flex", justifyContent: "center", gap: 0.5 }}>
                                       <Typography

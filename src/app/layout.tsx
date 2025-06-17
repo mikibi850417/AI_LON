@@ -4,7 +4,6 @@
 import { useState } from "react";
 import { SessionContextProvider } from "@supabase/auth-helpers-react";
 import { createPagesBrowserClient } from "@supabase/auth-helpers-nextjs";
-import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Footer from "./components/Footer";
@@ -30,7 +29,8 @@ export default function RootLayout({
       name: "sb-auth-token",
       path: "/",
       sameSite: "lax",
-      secure: true
+      secure: true,
+      domain: typeof window !== 'undefined' ? window.location.hostname : undefined
     }
   }));
 

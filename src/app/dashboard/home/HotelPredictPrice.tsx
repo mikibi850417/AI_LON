@@ -4,8 +4,14 @@ import React, { useState, useEffect } from "react";
 import { Box } from "@mui/material";
 import CommonHotelPredictPrice, { StatsInfo } from "@/lib/components/HotelPredictPrice";
 
+interface HotelData {
+  hotel_name: string;
+  date: string;
+  min_price: string | number;
+}
+
 interface Props {
-  data: any[];
+  data: HotelData[];
   dates: string[];
   userRegion: { location_code: string; region: string } | null;
 }
@@ -34,7 +40,7 @@ export default function HotelPredictPrice({ data, dates, userRegion }: Props) {
       // 마지막 날짜의 가격 데이터
       const lastDatePrices = data
         .filter(item => item.date === lastDate)
-        .map(item => parseFloat(item.min_price));
+        .map(item => typeof item.min_price === 'string' ? parseFloat(item.min_price) : item.min_price);
 
       if (lastDatePrices.length > 0) {
         const avgPrice = lastDatePrices.reduce((sum, price) => sum + price, 0) / lastDatePrices.length;
@@ -52,7 +58,7 @@ export default function HotelPredictPrice({ data, dates, userRegion }: Props) {
         });
       } else {
         // 마지막 날짜 데이터가 없으면 전체 데이터 평균으로 계산
-        const allPrices = data.map(item => parseFloat(item.min_price));
+        const allPrices = data.map(item => typeof item.min_price === 'string' ? parseFloat(item.min_price) : item.min_price);
         const avgPrice = allPrices.reduce((sum, price) => sum + price, 0) / allPrices.length;
         const minPrice = Math.min(...allPrices);
         const maxPrice = Math.max(...allPrices);
@@ -74,7 +80,7 @@ export default function HotelPredictPrice({ data, dates, userRegion }: Props) {
   const getPricesForDate = (date: string): number[] => {
     return data
       .filter((item) => item.date === date)
-      .map((item) => parseFloat(item.min_price))
+      .map((item) => typeof item.min_price === 'string' ? parseFloat(item.min_price) : item.min_price)
       .sort((a, b) => a - b);
   };
 

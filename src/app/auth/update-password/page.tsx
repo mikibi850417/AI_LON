@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import Image from "next/image";
 import { Box, TextField, Button, Typography, CircularProgress, Paper, Alert } from "@mui/material";
@@ -13,7 +13,7 @@ const UpdatePasswordPage = () => {
   // 환경 변수에서 authPath를 불러오며, 기본값은 "/auth"
   const authPath = process.env.NEXT_PUBLIC_AUTH_PATH || "/auth";
   const router = useRouter();
-  
+
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -32,7 +32,7 @@ const UpdatePasswordPage = () => {
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // 비밀번호 유효성 검사
     const passwordError = validatePassword();
     if (passwordError) {
@@ -59,16 +59,16 @@ const UpdatePasswordPage = () => {
         type: "success",
         text: "비밀번호가 성공적으로 변경되었습니다."
       });
-      
+
       // 비밀번호 변경 성공 후 3초 후에 로그인 페이지로 리디렉션
       setTimeout(() => {
         router.push(`${authPath}/login`);
       }, 3000);
-      
-    } catch (error: any) {
+
+    } catch (error: unknown) {
       setMessage({
         type: "error",
-        text: `비밀번호 변경 실패: ${error.message}`
+        text: `비밀번호 변경 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`
       });
     } finally {
       setLoading(false);
@@ -137,17 +137,17 @@ const UpdatePasswordPage = () => {
             alt="Company Logo"
             width={200}
             height={70}
-            style={{ 
-              objectFit: 'contain', 
-              marginBottom: '16px', 
-              position: 'relative', 
+            style={{
+              objectFit: 'contain',
+              marginBottom: '16px',
+              position: 'relative',
               zIndex: 1,
               filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))'
             }}
           />
-          <Typography variant="h5" sx={{ 
-            color: 'white', 
-            fontWeight: 'bold', 
+          <Typography variant="h5" sx={{
+            color: 'white',
+            fontWeight: 'bold',
             textShadow: '0 2px 4px rgba(0,0,0,0.3)',
             position: 'relative',
             zIndex: 1
@@ -158,10 +158,10 @@ const UpdatePasswordPage = () => {
 
         <Box sx={{ p: 4 }}>
           {message && (
-            <Alert 
-              severity={message.type} 
-              sx={{ 
-                mb: 3, 
+            <Alert
+              severity={message.type}
+              sx={{
+                mb: 3,
                 borderRadius: '12px',
                 animation: message.type === 'error' ? 'pulse 2s infinite' : 'none',
                 '@keyframes pulse': {

@@ -1,40 +1,181 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import PortOne from '@portone/browser-sdk/v2';
 import { supabase } from '@/lib/supabaseClient';
 import { SubscriptionPlan, PaymentStatus, SubscriptionStatus } from './types';
+import { Session } from '@supabase/supabase-js';
 
 export const usePayment = () => {
     const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
     const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>({ status: 'IDLE' });
     const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null);
     const [loading, setLoading] = useState(true);
-    const [userSession, setUserSession] = useState<any>(null);
+    const [userSession, setUserSession] = useState<Session | null>(null);
+    const [initialized, setInitialized] = useState(false);
 
     // API 기본 URL
     const API_BASE_URL = 'https://ailon.iptime.org:8000';
 
-    useEffect(() => {
-        initializeAuth();
-    }, []);
-
-    const initializeAuth = async () => {
+    // loadInitialData 함수 - userSession을 매개변수로 받도록 수정
+    const loadInitialData = useCallback(async (session?: Session | null) => {
         try {
-            const { data: { session }, error } = await supabase.auth.getSession();
-            if (error) {
-                console.error('Error getting session:', error);
+            setLoading(true);
+
+            const currentSession = session;
+            if (!currentSession?.access_token) {
+                console.warn('No valid session found, using demo data');
+                // 세션이 없을 때 데모 데이터 제공
+                setPlans([
+                    {
+                        id: 'basic',
+                        name: 'Basic Plan',
+                        price: 29000,
+                        months: 1,
+                        description: '기본 플랜 - 기본 기능, 월 100회 조회'
+                    },
+                    {
+                        id: 'premium',
+                        name: 'Premium Plan', 
+                        price: 49000,
+                        months: 1,
+                        description: '프리미엄 플랜 - 모든 기능, 무제한 조회, 우선 지원'
+                    }
+                ]);
+                setSubscriptionStatus(null);
+                setLoading(false);
                 return;
             }
 
-            if (session) {
-                setUserSession(session);
-                await loadInitialData(session);
-            } else {
-                console.error('No active session found');
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentSession.access_token}`
+            };
+
+            try {
+                // 구독 플랜 목록 로드
+                const plansResponse = await fetch(`${API_BASE_URL}/api/billing/plans`, {
+                    headers
+                });
+                
+                if (plansResponse.ok) {
+                    const plansData = await plansResponse.json();
+                    setPlans(plansData.plans || []);
+                } else {
+                    console.warn('Failed to fetch plans, using fallback data');
+                    // API 호출 실패 시 fallback 데이터 제공
+                    setPlans([
+                        {
+                            id: 'basic',
+                            name: 'Basic Plan',
+                            price: 29000,
+                            months: 1,
+                            description: '기본 플랜 - 기본 기능, 월 100회 조회'
+                        },
+                        {
+                            id: 'premium',
+                            name: 'Premium Plan',
+                            price: 49000,
+                            months: 1,
+                            description: '프리미엄 플랜 - 모든 기능, 무제한 조회, 우선 지원'
+                        }
+                    ]);
+                }
+            } catch (plansError) {
+                console.warn('Network error fetching plans:', plansError);
+                // 네트워크 에러 시 fallback 데이터 제공
+                setPlans([
+                    {
+                        id: 'basic',
+                        name: 'Basic Plan',
+                        price: 29000,
+                        months: 1,
+                        description: '기본 플랜 - 기본 기능, 월 100회 조회'
+                    },
+                    {
+                        id: 'premium',
+                        name: 'Premium Plan',
+                        price: 49000,
+                        months: 1,
+                        description: '프리미엄 플랜 - 모든 기능, 무제한 조회, 우선 지원'
+                    }
+                ]);
             }
+
+            try {
+                // 현재 구독 상태 로드
+                const statusResponse = await fetch(`${API_BASE_URL}/api/billing/subscription/status`, {
+                    headers
+                });
+                
+                if (statusResponse.ok) {
+                    const statusData = await statusResponse.json();
+                    setSubscriptionStatus(statusData);
+                } else {
+                    console.warn('Failed to fetch subscription status');
+                    setSubscriptionStatus(null);
+                }
+            } catch (statusError) {
+                console.warn('Network error fetching subscription status:', statusError);
+                setSubscriptionStatus(null);
+            }
+
         } catch (error) {
-            console.error('Error initializing auth:', error);
+            console.error('Error loading initial data:', error);
+            // 전체적인 에러 발생 시에도 기본 데이터 제공
+            setPlans([
+                {
+                    id: 'basic',
+                    name: 'Basic Plan',
+                    price: 29000,
+                    months: 1,
+                    description: '기본 플랜 - 기본 기능, 월 100회 조회'
+                },
+                {
+                    id: 'premium',
+                    name: 'Premium Plan',
+                    price: 49000,
+                    months: 1,
+                    description: '프리미엄 플랜 - 모든 기능, 무제한 조회, 우선 지원'
+                }
+            ]);
+            setSubscriptionStatus(null);
+        } finally {
+            setLoading(false);
         }
-    };
+    }, []); // 의존성 배열 비우기
+
+    // 초기화는 한 번만 실행되도록 수정
+    useEffect(() => {
+        if (initialized) return;
+
+        const initializeAuth = async () => {
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                if (error) {
+                    console.error('Error getting session:', error);
+                    // 세션 에러가 있어도 기본 데이터는 로드
+                    await loadInitialData(null);
+                    return;
+                }
+
+                if (session) {
+                    setUserSession(session);
+                    await loadInitialData(session);
+                } else {
+                    console.warn('No active session found, loading with demo data');
+                    // 세션이 없어도 기본 데이터 로드
+                    await loadInitialData(null);
+                }
+            } catch (error) {
+                console.error('Error initializing auth:', error);
+                // 인증 초기화 실패 시에도 기본 데이터 로드
+                await loadInitialData(null);
+            } finally {
+                setInitialized(true);
+            }
+        };
+
+        initializeAuth();
+    }, [initialized, loadInitialData]); // initialized와 loadInitialData에만 의존
 
     const getAuthHeaders = () => {
         if (!userSession?.access_token) {
@@ -45,44 +186,6 @@ export const usePayment = () => {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${userSession.access_token}`
         };
-    };
-
-    const loadInitialData = async (session?: any) => {
-        try {
-            setLoading(true);
-
-            const currentSession = session || userSession;
-            if (!currentSession?.access_token) {
-                throw new Error('No valid session');
-            }
-
-            const headers = {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${currentSession.access_token}`
-            };
-
-            // 구독 플랜 목록 로드
-            const plansResponse = await fetch(`${API_BASE_URL}/api/billing/plans`, {
-                headers
-            });
-            if (plansResponse.ok) {
-                const plansData = await plansResponse.json();
-                setPlans(plansData.plans);
-            }
-
-            // 현재 구독 상태 로드
-            const statusResponse = await fetch(`${API_BASE_URL}/api/billing/subscription/status`, {
-                headers
-            });
-            if (statusResponse.ok) {
-                const statusData = await statusResponse.json();
-                setSubscriptionStatus(statusData);
-            }
-        } catch (error) {
-            console.error('Error loading initial data:', error);
-        } finally {
-            setLoading(false);
-        }
     };
 
     const processPayment = async (selectedPlan: SubscriptionPlan): Promise<void> => {
@@ -159,7 +262,7 @@ export const usePayment = () => {
 
                 if (paymentComplete.status === 'PAID') {
                     // 구독 상태 새로고침
-                    await loadInitialData();
+                    await loadInitialData(userSession);
                 }
             } else {
                 const errorText = await completeResponse.text();
@@ -181,6 +284,11 @@ export const usePayment = () => {
         setPaymentStatus({ status: 'IDLE' });
     };
 
+    // 새로고침용 함수 - 현재 세션 사용
+    const refreshData = useCallback(async () => {
+        await loadInitialData(userSession);
+    }, [loadInitialData, userSession]);
+
     return {
         plans,
         paymentStatus,
@@ -188,6 +296,6 @@ export const usePayment = () => {
         loading,
         processPayment,
         resetPaymentStatus,
-        refreshData: loadInitialData
+        refreshData
     };
 };

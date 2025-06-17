@@ -18,6 +18,31 @@ import FlightIcon from '@mui/icons-material/Flight';
 
 ChartJS.register(...registerables);
 
+// FastAPI 스타일 타입 정의
+interface FlightData {
+  departure: string;
+  destination?: string;
+  fare_date: string;
+  mean_fare: number;
+  airline?: string;
+  flight_number?: string;
+}
+
+interface PCAItem {
+  index: string | number;
+  PC1: number;
+  PC2?: number;
+}
+
+interface PCAResponse {
+  df_pca: PCAItem[];
+}
+
+interface PCAData {
+  dates: string[];
+  pc1: number[];
+}
+
 // API 베이스 URL 가져오기
 const getApiBaseUrl = (): string => {
   return process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
@@ -61,8 +86,8 @@ export default function FlightTrendChart() {
   // 종료일: 오늘부터 30일 후 (고정) - 별도로 지정할 수 없음
   const endDate = calcEndDate();
   const [selectedDepartures, setSelectedDepartures] = useState<string[]>([]);
-  const [data, setData] = useState<any[]>([]);
-  const [pcaData, setPcaData] = useState<{ dates: string[]; pc1: number[] }>({
+  const [data, setData] = useState<FlightData[]>([]);
+  const [pcaData, setPcaData] = useState<PCAData>({
     dates: [],
     pc1: [],
   });
@@ -95,10 +120,11 @@ export default function FlightTrendChart() {
       if (!res.ok) {
         throw new Error("API 요청 실패");
       }
-      const json = await res.json();
+      const json = await res.json() as FlightData[];
       setData(json);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -121,17 +147,18 @@ export default function FlightTrendChart() {
       if (!res.ok) {
         throw new Error("PCA API 요청 실패");
       }
-      const json = await res.json();
+      const json = await res.json() as PCAResponse;
       if (json.df_pca && Array.isArray(json.df_pca)) {
         // 각 항목의 index 값을 yyyy-mm-dd 형식으로 변환
-        const dates = json.df_pca.map((item: any) =>
+        const dates = json.df_pca.map((item: PCAItem) =>
           new Date(item.index).toISOString().split("T")[0]
         );
-        const pc1 = json.df_pca.map((item: any) => item.PC1);
+        const pc1 = json.df_pca.map((item: PCAItem) => item.PC1);
         setPcaData({ dates, pc1 });
       }
-    } catch (err: any) {
-      console.error("PCA 데이터 호출 오류:", err.message);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      console.error("PCA 데이터 호출 오류:", errorMessage);
     }
   }, [startDate, endDate]);
 
@@ -142,54 +169,54 @@ export default function FlightTrendChart() {
   }, [fetchData, fetchPCAData]);
 
   // 항공 데이터: 출발지별 그룹화
-  const groupedData = data.reduce((acc: any, cur: any) => {
+  const groupedData: Record<string, FlightData[]> = data.reduce((acc: Record<string, FlightData[]>, cur: FlightData) => {
     const { departure } = cur;
     if (!acc[departure]) {
       acc[departure] = [];
     }
     acc[departure].push(cur);
     return acc;
-  }, {} as Record<string, any[]>);
+  }, {});
 
   // 그룹별 날짜순 정렬 (날짜 문자열 비교 시 ISO 형식이면 괜찮음)
   Object.keys(groupedData).forEach((dep) => {
     groupedData[dep].sort(
-      (a: any, b: any) => new Date(a.fare_date).getTime() - new Date(b.fare_date).getTime()
+      (a: FlightData, b: FlightData) => new Date(a.fare_date).getTime() - new Date(b.fare_date).getTime()
     );
   });
 
   return (
-    <Box sx={{ 
-      padding: { xs: '16px', md: '24px' }, 
-      maxWidth: '1400px', 
-      margin: '0 auto', 
-      display: 'flex', 
-      flexDirection: 'column', 
+    <Box sx={{
+      padding: { xs: '16px', md: '24px' },
+      maxWidth: '1400px',
+      margin: '0 auto',
+      display: 'flex',
+      flexDirection: 'column',
       gap: '24px',
       minHeight: 'calc(100vh - 100px)'
     }}>
       {/* 헤더 섹션 */}
-      <h1 className="text-2xl font-bold mb-4" style={{ 
+      <h1 className="text-2xl font-bold mb-4" style={{
         color: '#2c3e50',
         padding: '16px 0',
         borderBottom: '2px solid #e2e8f0',
         display: 'flex',
         alignItems: 'center'
       }}>
-        <FlightIcon style={{ marginRight: '8px', color: '#2c3e50' }} /> 
+        <FlightIcon style={{ marginRight: '8px', color: '#2c3e50' }} />
         Flight Prices
       </h1>
-      
+
       {/* 메인 콘텐츠 영역 */}
-      <Box sx={{ 
-        display: 'flex', 
-        flexDirection: 'column', 
+      <Box sx={{
+        display: 'flex',
+        flexDirection: 'column',
         gap: '24px',
         width: '100%'
       }}>
         {/* 필터 영역 */}
-        <Box sx={{ 
-          borderRadius: '16px', 
+        <Box sx={{
+          borderRadius: '16px',
           overflow: 'hidden',
           boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
           backgroundColor: 'white'
@@ -209,7 +236,7 @@ export default function FlightTrendChart() {
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
                 InputLabelProps={{ shrink: true }}
-                sx={{ 
+                sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '8px',
                     '&:hover fieldset': {
@@ -242,7 +269,7 @@ export default function FlightTrendChart() {
                       .map(code => airportNames[code] || code)
                       .join(", ");
                   }}
-                  sx={{ 
+                  sx={{
                     borderRadius: '8px',
                     '&:hover': {
                       '& .MuiOutlinedInput-notchedOutline': {
@@ -266,10 +293,10 @@ export default function FlightTrendChart() {
                   ))}
                 </Select>
               </FormControl>
-              <Button 
-                variant="contained" 
+              <Button
+                variant="contained"
                 onClick={fetchData}
-                sx={{ 
+                sx={{
                   backgroundColor: '#2c3e50',
                   '&:hover': {
                     backgroundColor: '#34495e',
@@ -292,10 +319,10 @@ export default function FlightTrendChart() {
           </Box>
         )}
         {error && (
-          <Box sx={{ 
-            p: 3, 
-            backgroundColor: '#fee2e2', 
-            color: '#b91c1c', 
+          <Box sx={{
+            p: 3,
+            backgroundColor: '#fee2e2',
+            color: '#b91c1c',
             borderRadius: '8px',
             border: '1px solid #f87171'
           }}>
@@ -305,14 +332,14 @@ export default function FlightTrendChart() {
 
         {/* PCA 트렌드 차트 */}
         {pcaData.dates.length > 0 && (
-          <Box sx={{ 
-            borderRadius: '16px', 
+          <Box sx={{
+            borderRadius: '16px',
             overflow: 'hidden',
             boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
             backgroundColor: 'white'
           }}>
-            <Box sx={{ 
-              p: 3, 
+            <Box sx={{
+              p: 3,
               borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
               display: 'flex',
               justifyContent: 'space-between',
@@ -321,11 +348,11 @@ export default function FlightTrendChart() {
               color: 'white'
             }}>
               <h2 className="text-lg font-semibold" style={{ color: 'white', display: 'flex', alignItems: 'center' }}>
-                <FlightIcon style={{ marginRight: '8px' }} /> 
+                <FlightIcon style={{ marginRight: '8px' }} />
                 AI 항공 요금 인사이트
               </h2>
             </Box>
-            
+
             <Box sx={{ p: 3 }}>
               <Line
                 data={{
@@ -343,18 +370,18 @@ export default function FlightTrendChart() {
                         const chart = context.chart;
                         const { ctx, chartArea } = chart;
                         if (!chartArea) return 'rgba(52, 152, 219, 0.2)'; // 기본값 반환
-                        
+
                         // y축 0 위치 계산
-                        const yScale = chart.scales.y;
-                        const zeroY = yScale.getPixelForValue(0);
-                        
+                        // const yScale = chart.scales.y;
+                        // const zeroY = yScale.getPixelForValue(0); // 사용되지 않는 변수 제거
+
                         // 그라데이션 생성
                         const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
                         gradient.addColorStop(0, 'rgba(231, 76, 60, 0.2)'); // 위쪽 (음수값) - 빨간색
-                        gradient.addColorStop(yScale.getPixelForValue(0) / chartArea.bottom, 'rgba(231, 76, 60, 0.05)');
-                        gradient.addColorStop(yScale.getPixelForValue(0) / chartArea.bottom, 'rgba(52, 152, 219, 0.05)');
+                        gradient.addColorStop(0.5, 'rgba(231, 76, 60, 0.05)');
+                        gradient.addColorStop(0.5, 'rgba(52, 152, 219, 0.05)');
                         gradient.addColorStop(1, 'rgba(52, 152, 219, 0.2)'); // 아래쪽 (양수값) - 파란색
-                        
+
                         return gradient;
                       },
                       fill: true,
@@ -373,7 +400,7 @@ export default function FlightTrendChart() {
                           // 선 색상도 값에 따라 변경
                           const p0 = context.p0.parsed;
                           const p1 = context.p1.parsed;
-                          
+
                           // 두 점이 모두 0보다 크거나 같으면 파란색
                           if (p0.y >= 0 && p1.y >= 0) return '#3498db';
                           // 두 점이 모두 0보다 작으면 빨간색
@@ -443,9 +470,9 @@ export default function FlightTrendChart() {
                 }}
               />
             </Box>
-            
-            <Box sx={{ 
-              p: 2, 
+
+            <Box sx={{
+              p: 2,
               borderTop: '1px solid rgba(0, 0, 0, 0.05)',
               backgroundColor: '#f8fafc',
               display: 'flex',
@@ -461,14 +488,14 @@ export default function FlightTrendChart() {
 
         {/* 출발지별 요금 차트 */}
         {Object.keys(groupedData).length > 0 && (
-          <Box sx={{ 
-            borderRadius: '16px', 
+          <Box sx={{
+            borderRadius: '16px',
             overflow: 'hidden',
             boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
             backgroundColor: 'white'
           }}>
-            <Box sx={{ 
-              p: 3, 
+            <Box sx={{
+              p: 3,
               borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
               display: 'flex',
               justifyContent: 'space-between',
@@ -477,12 +504,12 @@ export default function FlightTrendChart() {
               color: 'white'
             }}>
               <h2 className="text-lg font-semibold" style={{ color: 'white', display: 'flex', alignItems: 'center' }}>
-                <FlightIcon style={{ marginRight: '8px' }} /> 
+                <FlightIcon style={{ marginRight: '8px' }} />
                 출발지별 편도 요금
               </h2>
             </Box>
-            
-            <Box sx={{ 
+
+            <Box sx={{
               p: 3,
               maxHeight: '600px',  // 최대 높이 설정
               overflow: 'auto',    // 스크롤 적용
@@ -505,25 +532,25 @@ export default function FlightTrendChart() {
               <Grid container spacing={2}>
                 {Object.keys(groupedData).map((dep, index) => {
                   const depData = groupedData[dep];
-                  const labels = depData.map((item: any) => {
+                  const labels = depData.map((item: FlightData) => {
                     // 날짜에서 연도 부분 제거하고 월-일만 표시
                     const parts = item.fare_date.split('-');
                     return `${parts[1]}-${parts[2]}`;
                   });
-                  const fares = depData.map((item: any) => item.mean_fare);
+                  const fares = depData.map((item: FlightData) => item.mean_fare);
                   const minFare = Math.min(...fares);
                   const yMin = Math.floor(minFare * 0.7);
                   const color = chartColors[index % chartColors.length];
-                  
+
                   // 출발지가 하나만 선택되었는지 확인
                   const isSingleSelection = Object.keys(groupedData).length === 1;
-                  
+
                   return (
-                    <Grid 
-                      item 
-                      xs={12} 
-                      sm={isSingleSelection ? 12 : 6} 
-                      md={isSingleSelection ? 12 : 4} 
+                    <Grid
+                      item
+                      xs={12}
+                      sm={isSingleSelection ? 12 : 6}
+                      md={isSingleSelection ? 12 : 4}
                       key={dep}
                     >
                       <Box
@@ -553,9 +580,9 @@ export default function FlightTrendChart() {
                         >
                           {airportNames[dep] || dep}
                         </Box>
-                        <Box sx={{ 
-                          height: isSingleSelection ? 400 : 250, 
-                          width: '100%' 
+                        <Box sx={{
+                          height: isSingleSelection ? 400 : 250,
+                          width: '100%'
                         }}>
                           <Line
                             data={{
@@ -579,7 +606,7 @@ export default function FlightTrendChart() {
                               maintainAspectRatio: false,
                               scales: {
                                 x: {
-                                  title: { 
+                                  title: {
                                     display: isSingleSelection,
                                     text: "날짜",
                                     color: '#64748b'
@@ -599,7 +626,7 @@ export default function FlightTrendChart() {
                                 y: {
                                   beginAtZero: false,
                                   min: yMin,
-                                  title: { 
+                                  title: {
                                     display: isSingleSelection,
                                     text: "요금(원)",
                                     color: '#64748b'
@@ -616,7 +643,7 @@ export default function FlightTrendChart() {
                                 },
                               },
                               plugins: {
-                                legend: { 
+                                legend: {
                                   display: isSingleSelection,
                                   position: 'top',
                                   labels: {
@@ -644,7 +671,7 @@ export default function FlightTrendChart() {
                                     size: isSingleSelection ? 14 : 12
                                   },
                                   callbacks: {
-                                    label: function(context) {
+                                    label: function (context) {
                                       return `요금: ${context.parsed.y.toLocaleString()}원`;
                                     }
                                   }
@@ -659,9 +686,9 @@ export default function FlightTrendChart() {
                 })}
               </Grid>
             </Box>
-            
-            <Box sx={{ 
-              p: 2, 
+
+            <Box sx={{
+              p: 2,
               borderTop: '1px solid rgba(0, 0, 0, 0.05)',
               backgroundColor: '#f8fafc',
               display: 'flex',
@@ -682,36 +709,7 @@ export default function FlightTrendChart() {
   );
 }
 
-// 그라데이션 생성 함수 타입 추가
-const createGradient = (
-  context: {
-    p0: { x: number; y: number; parsed: { y: number } };
-    p1: { x: number; y: number; parsed: { y: number } };
-    chart: { ctx: CanvasRenderingContext2D }
-  }, 
-  colorStart: string, 
-  colorEnd: string
-): CanvasGradient => {
-  const { p0, p1 } = context;
-  const gradient = context.chart.ctx.createLinearGradient(p0.x, p0.y, p1.x, p1.y);
-  gradient.addColorStop(0, colorStart);
-  gradient.addColorStop(1, colorEnd);
-  return gradient;
-};
-
-// 출발지 옵션 및 차트 색상 배열
-const departureOptions = [
-  "CTS",
-  "FUK",
-  "HKG",
-  "KIX",
-  "NRT",
-  "PEK",
-  "PVG",
-  "TAO",
-  "TPE",
-];
-
+// 차트 색상 배열
 const chartColors = [
   { backgroundColor: "rgba(52, 152, 219, 0.2)", borderColor: "#3498db" },
   { backgroundColor: "rgba(230, 126, 34, 0.2)", borderColor: "#e67e22" },

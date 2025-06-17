@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "NODE_ENV=development node server.mjs",
+    "dev": "cross-env NODE_ENV=development node server.mjs",
     "build": "next build",
     "start": "NODE_ENV=production node server.mjs",
     "lint": "next lint"
@@ -19,6 +19,7 @@
     "@react-google-maps/api": "^2.20.6",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/auth-helpers-react": "^0.5.0",
+    "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.49.1",
     "autoprefixer": "^10.4.21",
     "axios": "^1.9.0",
@@ -42,6 +43,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "cross-env": "^7.0.3",
     "eslint": "^9",
     "eslint-config-next": "15.2.1",
     "typescript": "^5"
